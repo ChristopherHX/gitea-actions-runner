@@ -3,6 +3,7 @@ module gitea.com/gitea/act_runner
 go 1.18
 
 require (
+	github.com/gorilla/websocket v1.4.2
 	github.com/nektos/act v0.2.26
 	github.com/rs/zerolog v1.26.1
 	github.com/spf13/cobra v1.4.0

@@ -70,6 +70,13 @@ func Execute(ctx context.Context) {
 		Version:      version,
 		SilenceUsage: true,
 	}
+	rootCmd.AddCommand(&cobra.Command{
+		Aliases: []string{"daemon"},
+		Use:     "daemon [event name to run]\nIf no event name passed, will default to \"on: push\"",
+		Short:   "Run GitHub actions locally by specifying the event name (e.g. `push`) or an action name directly.",
+		Args:    cobra.MaximumNArgs(1),
+		RunE:    runDaemon(ctx, &input),
+	})
 	rootCmd.Flags().BoolP("run", "r", false, "run workflows")
 	rootCmd.Flags().StringP("job", "j", "", "run job")
 	rootCmd.PersistentFlags().StringVarP(&input.forgeInstance, "forge-instance", "", "github.com", "Forge instance to use.")
@@ -96,91 +103,96 @@ func getWorkflowsPath() (string, error) {
 	return p, nil
 }
 
+func runTask(ctx context.Context, input *Input, jobID string) error {
+	workflowsPath, err := getWorkflowsPath()
+	if err != nil {
+		return err
+	}
+	planner, err := model.NewWorkflowPlanner(workflowsPath, false)
+	if err != nil {
+		return err
+	}
+
+	var eventName string
+	events := planner.GetEvents()
+	if len(events) > 0 {
+		// set default event type to first event
+		// this way user dont have to specify the event.
+		log.Debug().Msgf("Using detected workflow event: %s", events[0])
+		eventName = events[0]
+	} else {
+		if plan := planner.PlanEvent("push"); plan != nil {
+			eventName = "push"
+		}
+	}
+
+	// build the plan for this run
+	var plan *model.Plan
+	if jobID != "" {
+		log.Debug().Msgf("Planning job: %s", jobID)
+		plan = planner.PlanJob(jobID)
+	} else {
+		log.Debug().Msgf("Planning event: %s", eventName)
+		plan = planner.PlanEvent(eventName)
+	}
+
+	curDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	// run the plan
+	config := &runner.Config{
+		Actor:           input.actor,
+		EventName:       eventName,
+		EventPath:       "",
+		DefaultBranch:   "",
+		ForcePull:       input.forcePull,
+		ForceRebuild:    input.forceRebuild,
+		ReuseContainers: input.reuseContainers,
+		Workdir:         curDir,
+		BindWorkdir:     input.bindWorkdir,
+		LogOutput:       true,
+		JSONLogger:      input.jsonLogger,
+		// Env:                   envs,
+		// Secrets:               secrets,
+		InsecureSecrets:       input.insecureSecrets,
+		Platforms:             input.newPlatforms(),
+		Privileged:            input.privileged,
+		UsernsMode:            input.usernsMode,
+		ContainerArchitecture: input.containerArchitecture,
+		ContainerDaemonSocket: input.containerDaemonSocket,
+		UseGitIgnore:          input.useGitIgnore,
+		GitHubInstance:        input.forgeInstance,
+		ContainerCapAdd:       input.containerCapAdd,
+		ContainerCapDrop:      input.containerCapDrop,
+		AutoRemove:            input.autoRemove,
+		ArtifactServerPath:    input.artifactServerPath,
+		ArtifactServerPort:    input.artifactServerPort,
+		NoSkipCheckout:        input.noSkipCheckout,
+		// RemoteName:            input.remoteName,
+	}
+	r, err := runner.New(config)
+	if err != nil {
+		return fmt.Errorf("New config failed: %v", err)
+	}
+
+	cancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
+
+	executor := r.NewPlanExecutor(plan).Finally(func(ctx context.Context) error {
+		cancel()
+		return nil
+	})
+	return executor(ctx)
+}
+
 func runCommand(ctx context.Context, input *Input) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		workflowsPath, err := getWorkflowsPath()
-		if err != nil {
-			return err
-		}
-		planner, err := model.NewWorkflowPlanner(workflowsPath, false)
+		jobID, err := cmd.Flags().GetString("job")
 		if err != nil {
 			return err
 		}
 
-		var eventName string
-		events := planner.GetEvents()
-		if len(events) > 0 {
-			// set default event type to first event
-			// this way user dont have to specify the event.
-			log.Debug().Msgf("Using detected workflow event: %s", events[0])
-			eventName = events[0]
-		} else {
-			if len(args) > 0 {
-				eventName = args[0]
-			} else if plan := planner.PlanEvent("push"); plan != nil {
-				eventName = "push"
-			}
-		}
-
-		// build the plan for this run
-		var plan *model.Plan
-		if jobID, err := cmd.Flags().GetString("job"); err != nil {
-			return err
-		} else if jobID != "" {
-			log.Debug().Msgf("Planning job: %s", jobID)
-			plan = planner.PlanJob(jobID)
-		} else {
-			log.Debug().Msgf("Planning event: %s", eventName)
-			plan = planner.PlanEvent(eventName)
-		}
-
-		curDir, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-
-		// run the plan
-		config := &runner.Config{
-			Actor:           input.actor,
-			EventName:       eventName,
-			EventPath:       "",
-			DefaultBranch:   "",
-			ForcePull:       input.forcePull,
-			ForceRebuild:    input.forceRebuild,
-			ReuseContainers: input.reuseContainers,
-			Workdir:         curDir,
-			BindWorkdir:     input.bindWorkdir,
-			LogOutput:       !input.noOutput,
-			JSONLogger:      input.jsonLogger,
-			// Env:                   envs,
-			// Secrets:               secrets,
-			InsecureSecrets:       input.insecureSecrets,
-			Platforms:             input.newPlatforms(),
-			Privileged:            input.privileged,
-			UsernsMode:            input.usernsMode,
-			ContainerArchitecture: input.containerArchitecture,
-			ContainerDaemonSocket: input.containerDaemonSocket,
-			UseGitIgnore:          input.useGitIgnore,
-			GitHubInstance:        input.forgeInstance,
-			ContainerCapAdd:       input.containerCapAdd,
-			ContainerCapDrop:      input.containerCapDrop,
-			AutoRemove:            input.autoRemove,
-			ArtifactServerPath:    input.artifactServerPath,
-			ArtifactServerPort:    input.artifactServerPort,
-			NoSkipCheckout:        input.noSkipCheckout,
-			// RemoteName:            input.remoteName,
-		}
-		r, err := runner.New(config)
-		if err != nil {
-			return fmt.Errorf("New config failed: %v", err)
-		}
-
-		cancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
-
-		executor := r.NewPlanExecutor(plan).Finally(func(ctx context.Context) error {
-			cancel()
-			return nil
-		})
-		return executor(ctx)
+		return runTask(ctx, input, jobID)
 	}
 }
