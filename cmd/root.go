@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 
 	"github.com/nektos/act/pkg/artifacts"
+	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
 	"github.com/rs/zerolog/log"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -60,7 +62,10 @@ func (i *Input) newPlatforms() map[string]string {
 }
 
 func Execute(ctx context.Context) {
-	input := Input{}
+	input := Input{
+		reuseContainers: true,
+		forgeInstance:   "gitea.com",
+	}
 
 	rootCmd := &cobra.Command{
 		Use:          "act [event name to run]\nIf no event name passed, will default to \"on: push\"",
@@ -101,6 +106,17 @@ func getWorkflowsPath() (string, error) {
 		return filepath.Join(dir, ".github/workflows"), nil
 	}
 	return p, nil
+}
+
+type StepHook struct{}
+
+func (hook *StepHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func (hook *StepHook) Fire(entry *logrus.Entry) error {
+	fmt.Printf("====== %#v \n ", entry)
+	return nil
 }
 
 func runTask(ctx context.Context, input *Input, jobID string) error {
@@ -176,6 +192,11 @@ func runTask(ctx context.Context, input *Input, jobID string) error {
 	if err != nil {
 		return fmt.Errorf("New config failed: %v", err)
 	}
+
+	log := logrus.StandardLogger()
+	log.AddHook(&StepHook{})
+
+	ctx = common.WithLogger(ctx, log)
 
 	cancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
 

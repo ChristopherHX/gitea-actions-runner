@@ -6,6 +6,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/nektos/act v0.2.26
 	github.com/rs/zerolog v1.26.1
+	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.4.0
 )
 
@@ -56,7 +57,6 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
-	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/xanzy/ssh-agent v0.3.1 // indirect
 	go.opencensus.io v0.23.0 // indirect

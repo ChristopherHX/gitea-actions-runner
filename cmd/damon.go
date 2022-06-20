@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -16,11 +19,21 @@ type Message struct {
 	Version      int    //
 	Type         int    // message type, 1 register 2 error
 	RunnerUUID   string // runner uuid
+	BuildUUID    string // build uuid
 	ErrCode      int    // error code
 	ErrContent   string // errors message
 	EventName    string
 	EventPayload string
+	JobID        string // only run the special job, empty means run all the jobs
 }
+
+const (
+	MsgTypeRegister     = iota + 1 // register
+	MsgTypeError                   // error
+	MsgTypeRequestBuild            // request build task
+	MsgTypeIdle                    // no task
+	MsgTypeBuildResult             // build result
+)
 
 func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args []string) error {
 	log.Info().Msgf("Starting runner daemon")
@@ -56,7 +69,7 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 					// register the client
 					msg := Message{
 						Version:    1,
-						Type:       1,
+						Type:       MsgTypeRegister,
 						RunnerUUID: "111111",
 					}
 					bs, err := json.Marshal(&msg)
@@ -109,20 +122,80 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 					switch msg.Version {
 					case 1:
 						switch msg.Type {
-						case 1:
-							log.Info().Msgf("received message: %s", message)
-						case 2:
-						case 4:
+						case MsgTypeRegister:
+							log.Info().Msgf("received registered success: %s", message)
+							conn.WriteJSON(&Message{
+								Version:    1,
+								Type:       MsgTypeRequestBuild,
+								RunnerUUID: msg.RunnerUUID,
+							})
+						case MsgTypeError:
+							log.Info().Msgf("received error msessage: %s", message)
+							conn.WriteJSON(&Message{
+								Version:    1,
+								Type:       MsgTypeRequestBuild,
+								RunnerUUID: msg.RunnerUUID,
+							})
+						case MsgTypeIdle:
 							log.Info().Msgf("received no task")
-						case 3:
+							conn.WriteJSON(&Message{
+								Version:    1,
+								Type:       MsgTypeRequestBuild,
+								RunnerUUID: msg.RunnerUUID,
+							})
+						case MsgTypeRequestBuild:
 							switch msg.EventName {
 							case "push":
 								input := Input{
-									forgeInstance: "github.com",
+									forgeInstance:   "github.com",
+									reuseContainers: true,
 								}
-								if err := runTask(context.Background(), &input, ""); err != nil {
-									log.Error().Msgf("run task failed: %v", err)
+
+								ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+								defer cancel()
+								sigs := make(chan os.Signal, 1)
+								signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+								done := make(chan error)
+								go func(chan error) {
+									done <- runTask(ctx, &input, "")
+								}(done)
+
+								c := time.NewTicker(time.Second)
+								defer c.Stop()
+
+							END:
+								for {
+									select {
+									case <-sigs:
+										cancel()
+										log.Info().Msgf("cancel task")
+										break END
+									case err := <-done:
+										if err != nil {
+											log.Error().Msgf("runTask failed: %v", err)
+											conn.WriteJSON(&Message{
+												Version:    1,
+												Type:       MsgTypeBuildResult,
+												RunnerUUID: msg.RunnerUUID,
+												BuildUUID:  msg.BuildUUID,
+												ErrCode:    1,
+												ErrContent: err.Error(),
+											})
+										} else {
+											log.Error().Msgf("runTask success")
+											conn.WriteJSON(&Message{
+												Version:    1,
+												Type:       MsgTypeBuildResult,
+												RunnerUUID: msg.RunnerUUID,
+												BuildUUID:  msg.BuildUUID,
+											})
+										}
+
+										break END
+									case <-c.C:
+									}
 								}
+
 							default:
 								log.Warn().Msgf("unknow event %s with payload %s", msg.EventName, msg.EventPayload)
 							}
