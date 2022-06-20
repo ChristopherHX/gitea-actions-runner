@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/nektos/act/pkg/artifacts"
-	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
 	"github.com/rs/zerolog/log"
@@ -193,10 +192,7 @@ func runTask(ctx context.Context, input *Input, jobID string) error {
 		return fmt.Errorf("New config failed: %v", err)
 	}
 
-	log := logrus.StandardLogger()
-	log.AddHook(&StepHook{})
-
-	ctx = common.WithLogger(ctx, log)
+	logrus.AddHook(&StepHook{})
 
 	cancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
 
