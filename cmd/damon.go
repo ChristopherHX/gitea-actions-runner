@@ -218,10 +218,11 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 							}
 							failedCnt = 0
 						}
-						return nil
+						break
 					}
 
 					if err := handleMessage(conn, sigs, message); err != nil {
+						log.Error().Msgf(err.Error())
 					}
 				}
 			}
