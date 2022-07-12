@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -36,7 +33,7 @@ const (
 	MsgTypeBuildResult             // build result
 )
 
-func handleVersion1(conn *websocket.Conn, sigs chan os.Signal, message []byte, msg *Message) error {
+func handleVersion1(ctx context.Context, conn *websocket.Conn, message []byte, msg *Message) error {
 	switch msg.Type {
 	case MsgTypeRegister:
 		log.Info().Msgf("received registered success: %s", message)
@@ -67,7 +64,7 @@ func handleVersion1(conn *websocket.Conn, sigs chan os.Signal, message []byte, m
 				reuseContainers: true,
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+			ctx, cancel := context.WithTimeout(ctx, time.Hour)
 			defer cancel()
 
 			done := make(chan error)
@@ -80,7 +77,7 @@ func handleVersion1(conn *websocket.Conn, sigs chan os.Signal, message []byte, m
 
 			for {
 				select {
-				case <-sigs:
+				case <-ctx.Done():
 					cancel()
 					log.Info().Msgf("cancel task")
 					return nil
@@ -115,7 +112,7 @@ func handleVersion1(conn *websocket.Conn, sigs chan os.Signal, message []byte, m
 }
 
 // TODO: handle the message
-func handleMessage(conn *websocket.Conn, sigs chan os.Signal, message []byte) error {
+func handleMessage(ctx context.Context, conn *websocket.Conn, message []byte) error {
 	var msg Message
 	if err := json.Unmarshal(message, &msg); err != nil {
 		return fmt.Errorf("unmarshal received message faild: %v", err)
@@ -123,7 +120,7 @@ func handleMessage(conn *websocket.Conn, sigs chan os.Signal, message []byte) er
 
 	switch msg.Version {
 	case 1:
-		return handleVersion1(conn, sigs, message, &msg)
+		return handleVersion1(ctx, conn, message, &msg)
 	default:
 		return fmt.Errorf("recevied a message with an unsupported version, consider upgrade your runner")
 	}
@@ -138,16 +135,10 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		var failedCnt int
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
 		for {
 			select {
-			case <-sigs:
-				log.Info().Msgf("cancel task")
-				return nil
-
 			case <-ctx.Done():
+				log.Info().Msgf("cancel task")
 				if conn != nil {
 					err = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 					if err != nil {
@@ -191,8 +182,8 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 
 				for {
 					select {
-					case <-sigs:
-						log.Info().Msgf("cancel task")
+					case <-ctx.Done():
+						log.Info().Msg("cancel task")
 						return nil
 					default:
 					}
@@ -221,7 +212,7 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 						break
 					}
 
-					if err := handleMessage(conn, sigs, message); err != nil {
+					if err := handleMessage(ctx, conn, message); err != nil {
 						log.Error().Msgf(err.Error())
 					}
 				}
