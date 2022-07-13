@@ -9,25 +9,26 @@ import (
 	"gitea.com/gitea/act_runner/cmd"
 )
 
-func main() {
-	ctx := context.Background()
+func withContextFunc(ctx context.Context, f func()) context.Context {
 	ctx, cancel := context.WithCancel(ctx)
-
-	// trap Ctrl+C and call cancel on the context
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-	defer func() {
-		signal.Stop(c)
-		cancel()
-	}()
 	go func() {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+		defer signal.Stop(c)
+
 		select {
+		case <-ctx.Done():
 		case <-c:
 			cancel()
-		case <-ctx.Done():
+			f()
 		}
 	}()
 
+	return ctx
+}
+
+func main() {
+	ctx := withContextFunc(context.Background(), func() {})
 	// run the command
 	cmd.Execute(ctx)
 }
