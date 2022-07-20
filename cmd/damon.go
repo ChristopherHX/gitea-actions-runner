@@ -188,8 +188,10 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 					default:
 					}
 
-					conn.SetReadDeadline(time.Now().Add(timeout))
-					conn.SetPongHandler(func(string) error { conn.SetReadDeadline(time.Now().Add(timeout)); return nil })
+					_ = conn.SetReadDeadline(time.Now().Add(timeout))
+					conn.SetPongHandler(func(string) error {
+						return conn.SetReadDeadline(time.Now().Add(timeout))
+					})
 
 					_, message, err := conn.ReadMessage()
 					if err != nil {
