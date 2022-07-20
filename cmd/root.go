@@ -10,7 +10,6 @@ import (
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
 	"github.com/rs/zerolog/log"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -107,17 +106,6 @@ func getWorkflowsPath() (string, error) {
 	return p, nil
 }
 
-type StepHook struct{}
-
-func (hook *StepHook) Levels() []logrus.Level {
-	return logrus.AllLevels
-}
-
-func (hook *StepHook) Fire(entry *logrus.Entry) error {
-	fmt.Printf("====== %#v \n ", entry)
-	return nil
-}
-
 func runTask(ctx context.Context, input *Input, jobID string) error {
 	workflowsPath, err := getWorkflowsPath()
 	if err != nil {
@@ -191,8 +179,6 @@ func runTask(ctx context.Context, input *Input, jobID string) error {
 	if err != nil {
 		return fmt.Errorf("New config failed: %v", err)
 	}
-
-	logrus.AddHook(&StepHook{})
 
 	cancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
 
