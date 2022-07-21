@@ -5,10 +5,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"gitea.com/gitea/act_runner/cmd/config"
+
+	"github.com/joho/godotenv"
+	"github.com/mattn/go-isatty"
 	"github.com/nektos/act/pkg/artifacts"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
@@ -59,7 +65,40 @@ func (i *Input) newPlatforms() map[string]string {
 	}
 }
 
+// helper function cfgures the logging.
+func initLogging(cfg config.Config) {
+	isTerm := isatty.IsTerminal(os.Stdout.Fd())
+
+	switch strings.ToLower(cfg.Logging.Level) {
+	case "panic":
+		zerolog.SetGlobalLevel(zerolog.PanicLevel)
+	case "fatal":
+		zerolog.SetGlobalLevel(zerolog.FatalLevel)
+	case "error":
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+	case "warn":
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	case "info":
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	case "debug":
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	default:
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	}
+
+	if cfg.Logging.Pretty || isTerm {
+		log.Logger = log.Output(
+			zerolog.ConsoleWriter{
+				Out:     os.Stderr,
+				NoColor: cfg.Logging.NoColor || !isTerm,
+			},
+		)
+	}
+}
+
 func Execute(ctx context.Context) {
+	var envfile string
+
 	input := Input{
 		reuseContainers: true,
 		forgeInstance:   "gitea.com",
@@ -83,6 +122,17 @@ func Execute(ctx context.Context) {
 	rootCmd.Flags().BoolP("run", "r", false, "run workflows")
 	rootCmd.Flags().StringP("job", "j", "", "run job")
 	rootCmd.PersistentFlags().StringVarP(&input.forgeInstance, "forge-instance", "", "github.com", "Forge instance to use.")
+	rootCmd.PersistentFlags().StringVarP(&envfile, "env-file", "", ".env", "Read in a file of environment variables.")
+
+	_ = godotenv.Load(envfile)
+	cfg, err := config.Environ()
+	if err != nil {
+		log.Fatal().
+			Err(err).
+			Msg("invalid cfguration")
+	}
+
+	initLogging(cfg)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

@@ -127,9 +127,8 @@ func handleMessage(ctx context.Context, conn *websocket.Conn, message []byte) er
 }
 
 func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args []string) error {
-	log.Info().Msgf("Starting runner daemon")
-
 	return func(cmd *cobra.Command, args []string) error {
+		log.Info().Msg("Starting runner daemon")
 		var conn *websocket.Conn
 		var err error
 		ticker := time.NewTicker(time.Second)
