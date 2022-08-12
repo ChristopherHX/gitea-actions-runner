@@ -12,10 +12,12 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
 	"github.com/nektos/act/pkg/artifacts"
+	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -236,7 +238,25 @@ func runTask(ctx context.Context, input *Input, jobID string) error {
 		cancel()
 		return nil
 	})
+
+	outputHook := new(taskLogHook)
+	ctx = common.WithLoggerHook(ctx, outputHook)
 	return executor(ctx)
+}
+
+type taskLogHook struct{}
+
+func (h *taskLogHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func (h *taskLogHook) Fire(entry *logrus.Entry) error {
+	if flag, ok := entry.Data["raw_output"]; ok {
+		if flagVal, ok := flag.(bool); flagVal && ok {
+			log.Info().Msgf("task log: %s", entry.Message)
+		}
+	}
+	return nil
 }
 
 func runCommand(ctx context.Context, input *Input) func(cmd *cobra.Command, args []string) error {
