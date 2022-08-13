@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
-
-	"gitea.com/gitea/act_runner/cmd/config"
 
 	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
@@ -15,9 +12,7 @@ import (
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -67,34 +62,19 @@ func (i *Input) newPlatforms() map[string]string {
 	}
 }
 
-// helper function cfgures the logging.
-func initLogging(cfg config.Config) {
+// initLogging setup the global logrus logger.
+func initLogging(cfg Config) {
 	isTerm := isatty.IsTerminal(os.Stdout.Fd())
+	log.SetFormatter(&log.TextFormatter{
+		DisableColors: !isTerm,
+		FullTimestamp: true,
+	})
 
-	switch strings.ToLower(cfg.Logging.Level) {
-	case "panic":
-		zerolog.SetGlobalLevel(zerolog.PanicLevel)
-	case "fatal":
-		zerolog.SetGlobalLevel(zerolog.FatalLevel)
-	case "error":
-		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
-	case "warn":
-		zerolog.SetGlobalLevel(zerolog.WarnLevel)
-	case "info":
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	case "debug":
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	default:
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	if cfg.Debug {
+		log.SetLevel(log.DebugLevel)
 	}
-
-	if cfg.Logging.Pretty || isTerm {
-		log.Logger = log.Output(
-			zerolog.ConsoleWriter{
-				Out:     os.Stderr,
-				NoColor: cfg.Logging.NoColor || !isTerm,
-			},
-		)
+	if cfg.Trace {
+		log.SetLevel(log.TraceLevel)
 	}
 }
 
@@ -127,11 +107,9 @@ func Execute(ctx context.Context) {
 	rootCmd.PersistentFlags().StringVarP(&envfile, "env-file", "", ".env", "Read in a file of environment variables.")
 
 	_ = godotenv.Load(envfile)
-	cfg, err := config.Environ()
+	cfg, err := fromEnviron()
 	if err != nil {
-		log.Fatal().
-			Err(err).
-			Msg("invalid cfguration")
+		log.Fatal("invalid cfguration")
 	}
 
 	initLogging(cfg)
@@ -173,7 +151,7 @@ func runTask(ctx context.Context, input *Input, jobID string) error {
 	if len(events) > 0 {
 		// set default event type to first event
 		// this way user dont have to specify the event.
-		log.Debug().Msgf("Using detected workflow event: %s", events[0])
+		log.Debugf("Using detected workflow event: %s", events[0])
 		eventName = events[0]
 	} else {
 		if plan := planner.PlanEvent("push"); plan != nil {
@@ -184,10 +162,10 @@ func runTask(ctx context.Context, input *Input, jobID string) error {
 	// build the plan for this run
 	var plan *model.Plan
 	if jobID != "" {
-		log.Debug().Msgf("Planning job: %s", jobID)
+		log.Debugf("Planning job: %s", jobID)
 		plan = planner.PlanJob(jobID)
 	} else {
-		log.Debug().Msgf("Planning event: %s", eventName)
+		log.Debugf("Planning event: %s", eventName)
 		plan = planner.PlanEvent(eventName)
 	}
 
@@ -246,14 +224,14 @@ func runTask(ctx context.Context, input *Input, jobID string) error {
 
 type taskLogHook struct{}
 
-func (h *taskLogHook) Levels() []logrus.Level {
-	return logrus.AllLevels
+func (h *taskLogHook) Levels() []log.Level {
+	return log.AllLevels
 }
 
-func (h *taskLogHook) Fire(entry *logrus.Entry) error {
+func (h *taskLogHook) Fire(entry *log.Entry) error {
 	if flag, ok := entry.Data["raw_output"]; ok {
 		if flagVal, ok := flag.(bool); flagVal && ok {
-			log.Info().Msgf("task log: %s", entry.Message)
+			log.Infof("task log: %s", entry.Message)
 		}
 	}
 	return nil
