@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/engine"
 
 	"github.com/joho/godotenv"
@@ -164,7 +165,33 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 				}
 				time.Sleep(time.Second)
 			} else {
-				log.Debugln("successfully pinged the docker daemon")
+				log.Infoln("successfully pinged the docker daemon")
+				break
+			}
+		}
+
+		cli := client.New(
+			cfg.Client.Address,
+			cfg.Client.Secret,
+			cfg.Client.SkipVerify,
+		)
+
+		for {
+			err := cli.Ping(ctx, cfg.Runner.Name)
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+			}
+			if ctx.Err() != nil {
+				break
+			}
+			if err != nil {
+				log.WithError(err).
+					Errorln("cannot ping the remote server")
+				time.Sleep(time.Second)
+			} else {
+				log.Infoln("successfully pinged the remote server")
 				break
 			}
 		}

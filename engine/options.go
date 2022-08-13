@@ -22,7 +22,7 @@ func WithClient(c client.APIClient) Option {
 	})
 }
 
-// WithHidePull set custom client
+// WithHidePull hide pull event.
 func WithHidePull(v bool) Option {
 	return OptionFunc(func(q *Docker) {
 		q.hidePull = v
