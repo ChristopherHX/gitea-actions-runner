@@ -137,8 +137,7 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 
 		initLogging(cfg)
 
-		opts := engine.Opts{}
-		engine, err := engine.NewEnv(opts)
+		engine, err := engine.New()
 		if err != nil {
 			log.WithError(err).
 				Fatalln("cannot load the docker engine")
@@ -161,7 +160,7 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 				count++
 				if count == 5 {
 					log.WithError(err).
-						Fatalln("retry count reached")
+						Fatalf("retry count reached: %d", count)
 				}
 				time.Sleep(time.Second)
 			} else {
