@@ -3,12 +3,11 @@ module gitea.com/gitea/act_runner
 go 1.18
 
 require (
-	github.com/gorilla/websocket v1.4.2
+	github.com/docker/docker v20.10.17+incompatible
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mattn/go-isatty v0.0.14
 	github.com/nektos/act v0.2.26
-	github.com/rs/zerolog v1.26.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.5.0
 )
@@ -23,7 +22,6 @@ require (
 	github.com/containerd/containerd v1.6.6 // indirect
 	github.com/docker/cli v20.10.17+incompatible // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
-	github.com/docker/docker v20.10.17+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.6.4 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect

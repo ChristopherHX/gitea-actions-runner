@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
 	"github.com/nektos/act/pkg/artifacts"
 	"github.com/nektos/act/pkg/common"
@@ -19,7 +18,8 @@ import (
 const version = "0.1"
 
 type Input struct {
-	actor string
+	envFile string
+	actor   string
 	// workdir string
 	// workflowsPath         string
 	// autodetectEvent       bool
@@ -79,8 +79,6 @@ func initLogging(cfg Config) {
 }
 
 func Execute(ctx context.Context) {
-	var envfile string
-
 	input := Input{
 		reuseContainers: true,
 		forgeInstance:   "gitea.com",
@@ -104,15 +102,7 @@ func Execute(ctx context.Context) {
 	rootCmd.Flags().BoolP("run", "r", false, "run workflows")
 	rootCmd.Flags().StringP("job", "j", "", "run job")
 	rootCmd.PersistentFlags().StringVarP(&input.forgeInstance, "forge-instance", "", "github.com", "Forge instance to use.")
-	rootCmd.PersistentFlags().StringVarP(&envfile, "env-file", "", ".env", "Read in a file of environment variables.")
-
-	_ = godotenv.Load(envfile)
-	cfg, err := fromEnviron()
-	if err != nil {
-		log.Fatal("invalid cfguration")
-	}
-
-	initLogging(cfg)
+	rootCmd.PersistentFlags().StringVarP(&input.envFile, "env-file", "", ".env", "Read in a file of environment variables.")
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

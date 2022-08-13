@@ -5,8 +5,8 @@ import "github.com/kelseyhightower/envconfig"
 type (
 	// Config provides the system configuration.
 	Config struct {
-		Debug bool `envconfig:"DRONE_DEBUG"`
-		Trace bool `envconfig:"DRONE_TRACE"`
+		Debug bool `envconfig:"GITEA_DEBUG"`
+		Trace bool `envconfig:"GITEA_TRACE"`
 	}
 )
 
