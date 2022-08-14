@@ -2,6 +2,7 @@ package poller
 
 import (
 	"context"
+	"time"
 
 	"gitea.com/gitea/act_runner/client"
 
@@ -48,6 +49,9 @@ func (p *Poller) Poll(ctx context.Context, n int) {
 
 func (p *Poller) poll(ctx context.Context, thread int) error {
 	log.WithField("thread", thread).Info("poller: request stage from remote server")
+
+	// TODO: fetch the job from remote server
+	time.Sleep(time.Second)
 
 	return nil
 }
