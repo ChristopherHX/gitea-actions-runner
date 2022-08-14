@@ -15,11 +15,17 @@ import (
 )
 
 // New returns a new runner client.
-func New(endpoint, secret string, skipverify bool) *HTTPClient {
+func New(endpoint, secret string, skipverify bool, opts ...Option) *HTTPClient {
 	client := &HTTPClient{
 		Endpoint:   endpoint,
 		Secret:     secret,
 		SkipVerify: skipverify,
+	}
+
+	// Loop through each option
+	for _, opt := range opts {
+		// Call the option giving the instantiated
+		opt.Apply(client)
 	}
 
 	client.Client = &http.Client{
@@ -57,6 +63,8 @@ type HTTPClient struct {
 	Endpoint   string
 	Secret     string
 	SkipVerify bool
+
+	opts []connect.ClientOption
 }
 
 // Ping sends a ping message to the server to test connectivity.
@@ -64,6 +72,7 @@ func (p *HTTPClient) Ping(ctx context.Context, machine string) error {
 	client := v1connect.NewPingServiceClient(
 		p.Client,
 		p.Endpoint,
+		p.opts...,
 	)
 	req := connect.NewRequest(&v1.PingRequest{
 		Data: machine,

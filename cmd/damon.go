@@ -176,6 +176,8 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 			cfg.Client.Address,
 			cfg.Client.Secret,
 			cfg.Client.SkipVerify,
+			client.WithGRPC(cfg.Client.GRPC),
+			client.WithGRPCWeb(cfg.Client.GRPCWeb),
 		)
 
 		for {
