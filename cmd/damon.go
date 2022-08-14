@@ -6,6 +6,8 @@ import (
 
 	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/engine"
+	"gitea.com/gitea/act_runner/poller"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
@@ -196,7 +198,27 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 			}
 		}
 
-		return nil
+		var g errgroup.Group
+
+		poller := poller.New(cli)
+
+		g.Go(func() error {
+			log.WithField("capacity", cfg.Runner.Capacity).
+				WithField("endpoint", cfg.Client.Address).
+				WithField("os", cfg.Platform.OS).
+				WithField("arch", cfg.Platform.Arch).
+				Infoln("polling the remote server")
+
+			poller.Poll(ctx, cfg.Runner.Capacity)
+			return nil
+		})
+
+		err = g.Wait()
+		if err != nil {
+			log.WithError(err).
+				Errorln("shutting down the server")
+		}
+		return err
 		// var conn *websocket.Conn
 		// var err error
 		// ticker := time.NewTicker(time.Second)

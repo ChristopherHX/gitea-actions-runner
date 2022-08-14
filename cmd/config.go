@@ -29,6 +29,13 @@ type (
 			Environ  map[string]string `envconfig:"GITEA_RUNNER_ENVIRON"`
 			EnvFile  string            `envconfig:"GITEA_RUNNER_ENV_FILE"`
 		}
+
+		Platform struct {
+			OS      string `envconfig:"GITEA_PLATFORM_OS"    default:"linux"`
+			Arch    string `envconfig:"GITEA_PLATFORM_ARCH"  default:"amd64"`
+			Kernel  string `envconfig:"GITEA_PLATFORM_KERNEL"`
+			Variant string `envconfig:"GITEA_PLATFORM_VARIANT"`
+		}
 	}
 )
 
