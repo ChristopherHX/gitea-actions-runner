@@ -2,22 +2,26 @@ package poller
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	v1 "gitea.com/gitea/proto/gen/proto/v1"
 	"gitea.com/gitea/act_runner/client"
 
 	log "github.com/sirupsen/logrus"
 )
 
-func New(cli client.Client) *Poller {
+func New(cli client.Client, dispatch func(context.Context, *v1.Stage) error) *Poller {
 	return &Poller{
 		Client:       cli,
+		Dispatch:     dispatch,
 		routineGroup: newRoutineGroup(),
 	}
 }
 
 type Poller struct {
-	Client client.Client
+	Client   client.Client
+	Dispatch func(context.Context, *v1.Stage) error
 
 	routineGroup *routineGroup
 }
@@ -53,5 +57,21 @@ func (p *Poller) poll(ctx context.Context, thread int) error {
 	// TODO: fetch the job from remote server
 	time.Sleep(time.Second)
 
-	return nil
+	// request a new build stage for execution from the central
+	// build server.
+	stage, err := p.Client.Request(ctx)
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		log.WithError(err).Trace("poller: no stage returned")
+		return nil
+	}
+	if err != nil {
+		log.WithError(err).Error("poller: cannot request stage")
+		return err
+	}
+
+	if stage == nil || stage.BuildUuid == "" {
+		return nil
+	}
+
+	return p.Dispatch(ctx, stage)
 }

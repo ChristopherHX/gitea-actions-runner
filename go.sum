@@ -25,8 +25,8 @@ cloud.google.com/go/storage v1.6.0/go.mod h1:N7U0C8pVQ/+NIKOBQyamJIeKQKkZ+mxpohl
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 gitea.com/gitea/act v0.0.0-20220812010840-c467b06265ee h1:T0wftx4RaYqbTH4t0A7bXGXxemZloCrjReA7xJvIVdY=
 gitea.com/gitea/act v0.0.0-20220812010840-c467b06265ee/go.mod h1:G37Vfz4J6kJ5NbcPI5xQUkeWPVkUCP5J+MFkaWU9jNY=
-gitea.com/gitea/proto v0.0.0-20220813120843-ce4b5dd68c1f h1:o1fHWLbdhicM5Q6EXvpBLrpu/fVqlobYw1sU1YKSreM=
-gitea.com/gitea/proto v0.0.0-20220813120843-ce4b5dd68c1f/go.mod h1:LWD9G0VCMxaDY4I+J3vSqJF5OYNum33pQtRpx43516s=
+gitea.com/gitea/proto v0.0.0-20220814042910-32799131d693 h1:innZDNfMfvOBnvnfuFqCpk2XesFUKyaeFiEbNSsaxsA=
+gitea.com/gitea/proto v0.0.0-20220814042910-32799131d693/go.mod h1:LWD9G0VCMxaDY4I+J3vSqJF5OYNum33pQtRpx43516s=
 github.com/Azure/azure-sdk-for-go v16.2.1+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 h1:w+iIsaOQNcT7OZ575w+acHgRric5iCyQh+xv+KJ4HB8=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78/go.mod h1:LmzpDX56iTiv29bbRTIsUNlaFfuhWRQBWjQdVyAevI8=

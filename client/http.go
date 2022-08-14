@@ -83,3 +83,22 @@ func (p *HTTPClient) Ping(ctx context.Context, machine string) error {
 	_, err := client.Ping(ctx, req)
 	return err
 }
+
+// Ping sends a ping message to the server to test connectivity.
+func (p *HTTPClient) Request(ctx context.Context) (*v1.Stage, error) {
+	client := v1connect.NewRunnerServiceClient(
+		p.Client,
+		p.Endpoint,
+		p.opts...,
+	)
+	req := connect.NewRequest(&v1.ConnectRequest{})
+
+	req.Header().Set("X-Gitea-Token", p.Secret)
+
+	res, err := client.Connect(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Msg.Stage, err
+}
