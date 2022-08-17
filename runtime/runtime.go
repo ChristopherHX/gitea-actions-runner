@@ -3,8 +3,8 @@ package runtime
 import (
 	"context"
 
-	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 	"gitea.com/gitea/act_runner/client"
+	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 
 	"github.com/sirupsen/logrus"
 )

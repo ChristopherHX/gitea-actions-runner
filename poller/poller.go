@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 	"gitea.com/gitea/act_runner/client"
+	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 
 	log "github.com/sirupsen/logrus"
 )
