@@ -5,13 +5,13 @@ import (
 	"errors"
 	"time"
 
-	v1 "gitea.com/gitea/proto/gen/proto/v1"
+	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 	"gitea.com/gitea/act_runner/client"
 
 	log "github.com/sirupsen/logrus"
 )
 
-func New(cli client.Client, dispatch func(context.Context, *v1.Stage) error) *Poller {
+func New(cli client.Client, dispatch func(context.Context, *runnerv1.Stage) error) *Poller {
 	return &Poller{
 		Client:       cli,
 		Dispatch:     dispatch,
@@ -21,7 +21,7 @@ func New(cli client.Client, dispatch func(context.Context, *v1.Stage) error) *Po
 
 type Poller struct {
 	Client   client.Client
-	Dispatch func(context.Context, *v1.Stage) error
+	Dispatch func(context.Context, *runnerv1.Stage) error
 
 	routineGroup *routineGroup
 }

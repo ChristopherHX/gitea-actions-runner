@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	v1 "gitea.com/gitea/proto/gen/proto/v1"
-	"gitea.com/gitea/proto/gen/proto/v1/v1connect"
+	pingv1 "gitea.com/gitea/proto-go/ping/v1"
+	"gitea.com/gitea/proto-go/ping/v1/pingv1connect"
+	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
+	"gitea.com/gitea/proto-go/runner/v1/runnerv1connect"
 
 	"github.com/bufbuild/connect-go"
 	"golang.org/x/net/http2"
@@ -69,12 +71,12 @@ type HTTPClient struct {
 
 // Ping sends a ping message to the server to test connectivity.
 func (p *HTTPClient) Ping(ctx context.Context, machine string) error {
-	client := v1connect.NewPingServiceClient(
+	client := pingv1connect.NewPingServiceClient(
 		p.Client,
 		p.Endpoint,
 		p.opts...,
 	)
-	req := connect.NewRequest(&v1.PingRequest{
+	req := connect.NewRequest(&pingv1.PingRequest{
 		Data: machine,
 	})
 
@@ -85,13 +87,13 @@ func (p *HTTPClient) Ping(ctx context.Context, machine string) error {
 }
 
 // Ping sends a ping message to the server to test connectivity.
-func (p *HTTPClient) Request(ctx context.Context) (*v1.Stage, error) {
-	client := v1connect.NewRunnerServiceClient(
+func (p *HTTPClient) Request(ctx context.Context) (*runnerv1.Stage, error) {
+	client := runnerv1connect.NewRunnerServiceClient(
 		p.Client,
 		p.Endpoint,
 		p.opts...,
 	)
-	req := connect.NewRequest(&v1.ConnectRequest{})
+	req := connect.NewRequest(&runnerv1.ConnectRequest{})
 
 	req.Header().Set("X-Gitea-Token", p.Secret)
 

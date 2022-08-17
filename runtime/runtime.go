@@ -3,7 +3,7 @@ package runtime
 import (
 	"context"
 
-	v1 "gitea.com/gitea/proto/gen/proto/v1"
+	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 	"gitea.com/gitea/act_runner/client"
 
 	"github.com/sirupsen/logrus"
@@ -17,7 +17,7 @@ type Runner struct {
 }
 
 // Run runs the pipeline stage.
-func (s *Runner) Run(ctx context.Context, stage *v1.Stage) error {
+func (s *Runner) Run(ctx context.Context, stage *runnerv1.Stage) error {
 	l := logrus.
 		WithField("stage.build_uuid", stage.BuildUuid).
 		WithField("stage.runner_uuid", stage.RunnerUuid)
@@ -28,7 +28,7 @@ func (s *Runner) Run(ctx context.Context, stage *v1.Stage) error {
 	return s.run(ctx, stage)
 }
 
-func (s *Runner) run(ctx context.Context, stage *v1.Stage) error {
+func (s *Runner) run(ctx context.Context, stage *runnerv1.Stage) error {
 	l := logrus.
 		WithField("stage.build_uuid", stage.BuildUuid).
 		WithField("stage.runner_uuid", stage.RunnerUuid)
