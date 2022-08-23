@@ -15,11 +15,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args []string) error {
+func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		log.Infoln("Starting runner daemon")
 
-		_ = godotenv.Load(input.envFile)
+		_ = godotenv.Load(task.Input.EnvFile)
 		cfg, err := fromEnviron()
 		if err != nil {
 			log.WithError(err).
@@ -28,36 +28,10 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 
 		initLogging(cfg)
 
-		engine, err := engine.New()
-		if err != nil {
-			log.WithError(err).
-				Fatalln("cannot load the docker engine")
-		}
-
-		count := 0
-		for {
-			err := engine.Ping(ctx)
-			if err == context.Canceled {
-				break
-			}
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-			if err != nil {
-				log.WithError(err).
-					Errorln("cannot ping the docker daemon")
-				count++
-				if count == 5 {
-					log.WithError(err).
-						Fatalf("retry count reached: %d", count)
-				}
-				time.Sleep(time.Second)
-			} else {
-				log.Infoln("successfully pinged the docker daemon")
-				break
-			}
+		// try to connect to docker daemon
+		// if failed, exit with error
+		if err := engine.Start(ctx); err != nil {
+			log.WithError(err).Fatalln("failed to connect docker daemon engine")
 		}
 
 		cli := client.New(
@@ -81,6 +55,7 @@ func runDaemon(ctx context.Context, input *Input) func(cmd *cobra.Command, args 
 			if err != nil {
 				log.WithError(err).
 					Errorln("cannot ping the remote server")
+				// TODO: if ping failed, retry or exit
 				time.Sleep(time.Second)
 			} else {
 				log.Infoln("successfully pinged the remote server")
