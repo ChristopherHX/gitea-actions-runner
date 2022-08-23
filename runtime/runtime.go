@@ -35,6 +35,8 @@ func (s *Runner) run(ctx context.Context, stage *runnerv1.Stage) error {
 
 	l.Info("start running pipeline")
 	// TODO: docker runner with stage data
-
-	return nil
+	// task.Run is blocking, so we need to use goroutine to run it in backgroud
+	// return task metadata and status to the server
+	task := NewTask()
+	return task.Run(ctx)
 }
