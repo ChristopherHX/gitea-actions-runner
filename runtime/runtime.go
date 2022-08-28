@@ -9,6 +9,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Defines the Resource Kind and Type.
+const (
+	Kind = "pipeline"
+	Type = "docker"
+)
+
 // Runner runs the pipeline.
 type Runner struct {
 	Machine string
@@ -17,25 +23,24 @@ type Runner struct {
 }
 
 // Run runs the pipeline stage.
-func (s *Runner) Run(ctx context.Context, stage *runnerv1.Stage) error {
+func (s *Runner) Run(ctx context.Context, runner *runnerv1.Runner) error {
 	l := logrus.
-		WithField("stage.build_uuid", stage.BuildUuid).
-		WithField("stage.runner_uuid", stage.RunnerUuid)
+		WithField("runner.UUID", runner.Uuid).
+		WithField("runner.token", runner.Token)
 
-	l.Info("stage received")
-	// TODO: Update stage structure
+	l.Info("request a new task")
+	// TODO: get new task
 
-	return s.run(ctx, stage)
+	return s.run(ctx, runner)
 }
 
-func (s *Runner) run(ctx context.Context, stage *runnerv1.Stage) error {
+func (s *Runner) run(ctx context.Context, runner *runnerv1.Runner) error {
 	l := logrus.
-		WithField("stage.build_uuid", stage.BuildUuid).
-		WithField("stage.runner_uuid", stage.RunnerUuid)
+		WithField("runner.Uuid", runner.Uuid)
 
 	l.Info("start running pipeline")
 	// TODO: docker runner with stage data
-	// task.Run is blocking, so we need to use goroutine to run it in backgroud
+	// task.Run is blocking, so we need to use goroutine to run it in background
 	// return task metadata and status to the server
 	task := NewTask()
 	return task.Run(ctx)

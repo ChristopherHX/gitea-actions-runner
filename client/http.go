@@ -59,6 +59,8 @@ func New(endpoint, secret string, skipverify bool, opts ...Option) *HTTPClient {
 	return client
 }
 
+var _ Client = (*HTTPClient)(nil)
+
 // An HTTPClient manages communication with the runner API.
 type HTTPClient struct {
 	Client     *http.Client
@@ -80,27 +82,26 @@ func (p *HTTPClient) Ping(ctx context.Context, machine string) error {
 		Data: machine,
 	})
 
-	req.Header().Set("X-Gitea-Token", p.Secret)
+	req.Header().Set("X-Runner-Token", p.Secret)
 
 	_, err := client.Ping(ctx, req)
 	return err
 }
 
 // Ping sends a ping message to the server to test connectivity.
-func (p *HTTPClient) Request(ctx context.Context) (*runnerv1.Stage, error) {
+func (p *HTTPClient) Register(ctx context.Context, arg *runnerv1.RegisterRequest) (*runnerv1.Runner, error) {
 	client := runnerv1connect.NewRunnerServiceClient(
 		p.Client,
 		p.Endpoint,
 		p.opts...,
 	)
-	req := connect.NewRequest(&runnerv1.ConnectRequest{})
+	req := connect.NewRequest(arg)
+	req.Header().Set("X-Runner-Token", p.Secret)
 
-	req.Header().Set("X-Gitea-Token", p.Secret)
-
-	res, err := client.Connect(ctx, req)
+	res, err := client.Register(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	return res.Msg.Stage, err
+	return res.Msg.Runner, err
 }

@@ -71,7 +71,17 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 			Environ: cfg.Runner.Environ,
 		}
 
-		poller := poller.New(cli, runner.Run)
+		poller := poller.New(
+			cli,
+			runner.Run,
+			&client.Filter{
+				Kind:     runtime.Kind,
+				Type:     runtime.Type,
+				OS:       cfg.Platform.OS,
+				Arch:     cfg.Platform.Arch,
+				Capacity: cfg.Runner.Capacity,
+			},
+		)
 
 		g.Go(func() error {
 			log.WithField("capacity", cfg.Runner.Capacity).
@@ -80,8 +90,7 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 				WithField("arch", cfg.Platform.Arch).
 				Infoln("polling the remote server")
 
-			poller.Poll(ctx, cfg.Runner.Capacity)
-			return nil
+			return poller.Poll(ctx, cfg.Runner.Capacity)
 		})
 
 		err = g.Wait()

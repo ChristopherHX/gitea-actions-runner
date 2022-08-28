@@ -3,7 +3,7 @@ module gitea.com/gitea/act_runner
 go 1.18
 
 require (
-	gitea.com/gitea/proto-go v0.0.0-20220817054638-17fb0016dd41
+	gitea.com/gitea/proto-go v0.0.0-20220828031749-616e40329b57
 	github.com/bufbuild/connect-go v0.3.0
 	github.com/docker/docker v20.10.17+incompatible
 	github.com/joho/godotenv v1.4.0

@@ -2,7 +2,6 @@ package poller
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"gitea.com/gitea/act_runner/client"
@@ -11,9 +10,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func New(cli client.Client, dispatch func(context.Context, *runnerv1.Stage) error) *Poller {
+func New(cli client.Client, dispatch func(context.Context, *runnerv1.Runner) error, filter *client.Filter) *Poller {
 	return &Poller{
 		Client:       cli,
+		Filter:       filter,
 		Dispatch:     dispatch,
 		routineGroup: newRoutineGroup(),
 	}
@@ -21,12 +21,24 @@ func New(cli client.Client, dispatch func(context.Context, *runnerv1.Stage) erro
 
 type Poller struct {
 	Client   client.Client
-	Dispatch func(context.Context, *runnerv1.Stage) error
+	Filter   *client.Filter
+	Dispatch func(context.Context, *runnerv1.Runner) error
 
 	routineGroup *routineGroup
 }
 
-func (p *Poller) Poll(ctx context.Context, n int) {
+func (p *Poller) Poll(ctx context.Context, n int) error {
+	// register new runner.
+	runner, err := p.Client.Register(ctx, &runnerv1.RegisterRequest{
+		Os:       p.Filter.OS,
+		Arch:     p.Filter.Arch,
+		Capacity: int64(p.Filter.Capacity),
+	})
+	if err != nil {
+		log.WithError(err).Error("poller: cannot register new runner")
+		return err
+	}
+
 	for i := 0; i < n; i++ {
 		func(i int) {
 			p.routineGroup.Run(func() {
@@ -40,7 +52,7 @@ func (p *Poller) Poll(ctx context.Context, n int) {
 							log.Infof("stopping the runner: %d", i+1)
 							return
 						}
-						if err := p.poll(ctx, i+1); err != nil {
+						if err := p.poll(ctx, runner, i+1); err != nil {
 							log.WithError(err).Error("poll error")
 						}
 					}
@@ -49,29 +61,14 @@ func (p *Poller) Poll(ctx context.Context, n int) {
 		}(i)
 	}
 	p.routineGroup.Wait()
+	return nil
 }
 
-func (p *Poller) poll(ctx context.Context, thread int) error {
+func (p *Poller) poll(ctx context.Context, runner *runnerv1.Runner, thread int) error {
 	log.WithField("thread", thread).Info("poller: request stage from remote server")
 
 	// TODO: fetch the job from remote server
 	time.Sleep(time.Second)
 
-	// request a new build stage for execution from the central
-	// build server.
-	stage, err := p.Client.Request(ctx)
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		log.WithError(err).Trace("poller: no stage returned")
-		return nil
-	}
-	if err != nil {
-		log.WithError(err).Error("poller: cannot request stage")
-		return err
-	}
-
-	if stage == nil || stage.BuildUuid == "" {
-		return nil
-	}
-
-	return p.Dispatch(ctx, stage)
+	return p.Dispatch(ctx, runner)
 }
