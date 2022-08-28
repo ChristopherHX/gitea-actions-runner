@@ -30,7 +30,6 @@ func initLogging(cfg Config) {
 }
 
 func Execute(ctx context.Context) {
-
 	task := runtime.NewTask()
 
 	// ./act_runner

@@ -134,7 +134,7 @@ func (t *Task) Run(ctx context.Context) error {
 
 	// build the plan for this run
 	var plan *model.Plan
-	var jobID = t.JobID
+	jobID := t.JobID
 	if jobID != "" {
 		log.Debugf("Planning job: %s", jobID)
 		plan = planner.PlanJob(jobID)
