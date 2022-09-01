@@ -23,25 +23,16 @@ type Runner struct {
 }
 
 // Run runs the pipeline stage.
-func (s *Runner) Run(ctx context.Context, runner *runnerv1.Runner) error {
+func (s *Runner) Run(ctx context.Context, stage *runnerv1.Stage) error {
 	l := logrus.
-		WithField("runner.UUID", runner.Uuid).
-		WithField("runner.token", runner.Token)
-
-	l.Info("request a new task")
-	// TODO: get new task
-
-	return s.run(ctx, runner)
-}
-
-func (s *Runner) run(ctx context.Context, runner *runnerv1.Runner) error {
-	l := logrus.
-		WithField("runner.Uuid", runner.Uuid)
+		WithField("runner.ID", stage.Id).
+		WithField("runner.BuildID", stage.BuildId)
 
 	l.Info("start running pipeline")
 	// TODO: docker runner with stage data
 	// task.Run is blocking, so we need to use goroutine to run it in background
 	// return task metadata and status to the server
 	task := NewTask()
+
 	return task.Run(ctx)
 }

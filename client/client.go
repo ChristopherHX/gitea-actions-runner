@@ -21,4 +21,7 @@ type Client interface {
 
 	// Register for new runner.
 	Register(ctx context.Context, args *runnerv1.RegisterRequest) (*runnerv1.Runner, error)
+
+	// Request requests the next available build stage for execution.
+	Request(ctx context.Context, args *runnerv1.RequestRequest) (*runnerv1.Stage, error)
 }

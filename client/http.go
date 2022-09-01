@@ -88,7 +88,7 @@ func (p *HTTPClient) Ping(ctx context.Context, machine string) error {
 	return err
 }
 
-// Ping sends a ping message to the server to test connectivity.
+// Register a new runner.
 func (p *HTTPClient) Register(ctx context.Context, arg *runnerv1.RegisterRequest) (*runnerv1.Runner, error) {
 	client := runnerv1connect.NewRunnerServiceClient(
 		p.Client,
@@ -104,4 +104,22 @@ func (p *HTTPClient) Register(ctx context.Context, arg *runnerv1.RegisterRequest
 	}
 
 	return res.Msg.Runner, err
+}
+
+// Request requests the next available build stage for execution.
+func (p *HTTPClient) Request(ctx context.Context, arg *runnerv1.RequestRequest) (*runnerv1.Stage, error) {
+	client := runnerv1connect.NewRunnerServiceClient(
+		p.Client,
+		p.Endpoint,
+		p.opts...,
+	)
+	req := connect.NewRequest(arg)
+	req.Header().Set("X-Runner-Token", p.Secret)
+
+	res, err := client.Request(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Msg.Stage, err
 }
