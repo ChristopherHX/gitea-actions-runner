@@ -33,6 +33,8 @@ gitea.com/gitea/proto-go v0.0.0-20220828031749-616e40329b57 h1:eVM6m3h5KpmJM2+LE
 gitea.com/gitea/proto-go v0.0.0-20220828031749-616e40329b57/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
 gitea.com/gitea/proto-go v0.0.0-20220901061207-b88901a1b9bc h1:kTVjwKxXma2yAdgXz8T1tiJihtWFK8jGLqArX2NownM=
 gitea.com/gitea/proto-go v0.0.0-20220901061207-b88901a1b9bc/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
+gitea.com/gitea/proto-go v0.0.0-20220901135226-82a982903134 h1:5ofH0FGEkIj/P9a6oFDgkdmGSWow1yD1uubiftMA2Kw=
+gitea.com/gitea/proto-go v0.0.0-20220901135226-82a982903134/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
 github.com/Azure/azure-sdk-for-go v16.2.1+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 h1:w+iIsaOQNcT7OZ575w+acHgRric5iCyQh+xv+KJ4HB8=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78/go.mod h1:LmzpDX56iTiv29bbRTIsUNlaFfuhWRQBWjQdVyAevI8=

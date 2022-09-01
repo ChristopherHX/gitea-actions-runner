@@ -24,4 +24,10 @@ type Client interface {
 
 	// Request requests the next available build stage for execution.
 	Request(ctx context.Context, args *runnerv1.RequestRequest) (*runnerv1.Stage, error)
+
+	// Update updates the build stage.
+	Update(ctxt context.Context, args *runnerv1.UpdateRequest) error
+
+	// UpdateStep updates the build step.
+	UpdateStep(ctx context.Context, args *runnerv1.UpdateStepRequest) error
 }

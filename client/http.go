@@ -123,3 +123,33 @@ func (p *HTTPClient) Request(ctx context.Context, arg *runnerv1.RequestRequest) 
 
 	return res.Msg.Stage, err
 }
+
+// Update updates the build stage.
+func (p *HTTPClient) Update(ctx context.Context, arg *runnerv1.UpdateRequest) error {
+	client := runnerv1connect.NewRunnerServiceClient(
+		p.Client,
+		p.Endpoint,
+		p.opts...,
+	)
+	req := connect.NewRequest(arg)
+	req.Header().Set("X-Runner-Token", p.Secret)
+
+	_, err := client.Update(ctx, req)
+
+	return err
+}
+
+// UpdateStep updates the build step.
+func (p *HTTPClient) UpdateStep(ctx context.Context, arg *runnerv1.UpdateStepRequest) error {
+	client := runnerv1connect.NewRunnerServiceClient(
+		p.Client,
+		p.Endpoint,
+		p.opts...,
+	)
+	req := connect.NewRequest(arg)
+	req.Header().Set("X-Runner-Token", p.Secret)
+
+	_, err := client.UpdateStep(ctx, req)
+
+	return err
+}
