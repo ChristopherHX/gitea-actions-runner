@@ -25,14 +25,6 @@ cloud.google.com/go/storage v1.6.0/go.mod h1:N7U0C8pVQ/+NIKOBQyamJIeKQKkZ+mxpohl
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 gitea.com/gitea/act v0.0.0-20220812010840-c467b06265ee h1:T0wftx4RaYqbTH4t0A7bXGXxemZloCrjReA7xJvIVdY=
 gitea.com/gitea/act v0.0.0-20220812010840-c467b06265ee/go.mod h1:G37Vfz4J6kJ5NbcPI5xQUkeWPVkUCP5J+MFkaWU9jNY=
-gitea.com/gitea/proto-go v0.0.0-20220817054638-17fb0016dd41 h1:FIGF6szYd3lBIwvbeedfU5Lc7uG1Xpzi7bkktS6Vdvg=
-gitea.com/gitea/proto-go v0.0.0-20220817054638-17fb0016dd41/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
-gitea.com/gitea/proto-go v0.0.0-20220828011358-d0a015a5b095 h1:Ng3GDJLYpsG3lYdaqDzeZFkRm5ShA2V+LWJSHRD0IQ0=
-gitea.com/gitea/proto-go v0.0.0-20220828011358-d0a015a5b095/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
-gitea.com/gitea/proto-go v0.0.0-20220828031749-616e40329b57 h1:eVM6m3h5KpmJM2+LEqroENFaMs2kAo8QNIPyMgho9jg=
-gitea.com/gitea/proto-go v0.0.0-20220828031749-616e40329b57/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
-gitea.com/gitea/proto-go v0.0.0-20220901061207-b88901a1b9bc h1:kTVjwKxXma2yAdgXz8T1tiJihtWFK8jGLqArX2NownM=
-gitea.com/gitea/proto-go v0.0.0-20220901061207-b88901a1b9bc/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
 gitea.com/gitea/proto-go v0.0.0-20220901135226-82a982903134 h1:5ofH0FGEkIj/P9a6oFDgkdmGSWow1yD1uubiftMA2Kw=
 gitea.com/gitea/proto-go v0.0.0-20220901135226-82a982903134/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
 github.com/Azure/azure-sdk-for-go v16.2.1+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=

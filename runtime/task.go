@@ -5,12 +5,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
+	"time"
 
+	"gitea.com/gitea/act_runner/client"
 	"github.com/nektos/act/pkg/artifacts"
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+
+	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 )
 
 type TaskInput struct {
@@ -54,6 +60,7 @@ type TaskInput struct {
 
 type taskLogHook struct {
 	entries []*log.Entry
+	lock    sync.Mutex
 }
 
 func (h *taskLogHook) Levels() []log.Level {
@@ -62,27 +69,69 @@ func (h *taskLogHook) Levels() []log.Level {
 
 func (h *taskLogHook) Fire(entry *log.Entry) error {
 	if flag, ok := entry.Data["raw_output"]; ok {
+		h.lock.Lock()
 		if flagVal, ok := flag.(bool); flagVal && ok {
 			log.Infof("task log: %s", entry.Message)
 			h.entries = append(h.entries, entry)
 		}
+		h.lock.Unlock()
 	}
 	return nil
 }
 
-type Task struct {
-	JobID   string
-	Input   *TaskInput
-	LogHook *taskLogHook
+func (h *taskLogHook) swapLogs() []*log.Entry {
+	if len(h.entries) == 0 {
+		return nil
+	}
+	h.lock.Lock()
+	entries := h.entries
+	h.entries = nil
+	h.lock.Unlock()
+	return entries
 }
 
-func NewTask() *Task {
+type TaskState int
+
+const (
+	// TaskStateUnknown is the default state
+	TaskStateUnknown TaskState = iota
+	// TaskStatePending is the pending state
+	// pending means task is received, parsing actions and preparing to run
+	TaskStatePending
+	// TaskStateRunning is the state when the task is running
+	// running means task is running
+	TaskStateRunning
+	// TaskStateSuccess is the state when the task is successful
+	// success means task is successful without any error
+	TaskStateSuccess
+	// TaskStateFailure is the state when the task is failed
+	// failure means task is failed with error
+	TaskStateFailure
+)
+
+type Task struct {
+	BuildID int64
+	Input   *TaskInput
+
+	logHook *taskLogHook
+	state   TaskState
+	client  client.Client
+	log     *logrus.Entry
+}
+
+// newTask creates a new task
+func NewTask(buildID int64) *Task {
 	task := &Task{
 		Input: &TaskInput{
 			reuseContainers: true,
 			ForgeInstance:   "gitea",
 		},
-		LogHook: &taskLogHook{},
+		BuildID: buildID,
+
+		state:   TaskStatePending,
+		client:  nil,
+		log:     logrus.WithField("buildID", buildID),
+		logHook: &taskLogHook{},
 	}
 	task.Input.repoDirectory, _ = os.Getwd()
 	return task
@@ -109,14 +158,86 @@ func demoPlatforms() map[string]string {
 	}
 }
 
-func (t *Task) Run(ctx context.Context) error {
+// reportFailure reports the failure of the task
+func (t *Task) reportFailure(ctx context.Context, err error) {
+	t.state = TaskStateFailure
+	finishTask(t.BuildID)
+
+	t.log.Errorf("task failed: %v", err)
+
+	if t.client == nil {
+		// TODO: fill the step request
+		stepRequest := &runnerv1.UpdateStepRequest{}
+		t.client.UpdateStep(ctx, stepRequest)
+		return
+	}
+
+}
+
+func (t *Task) startReporting(interval int64, ctx context.Context) {
+	for {
+		time.Sleep(time.Duration(interval) * time.Second)
+		if t.state == TaskStateSuccess || t.state == TaskStateFailure {
+			t.log.Debugf("task reporting stopped")
+			break
+		}
+		t.reportStep(ctx)
+	}
+}
+
+// reportStep reports the step of the task
+func (t *Task) reportStep(ctx context.Context) {
+	if t.client == nil {
+		return
+	}
+	logValues := t.logHook.swapLogs()
+	if len(logValues) == 0 {
+		t.log.Debugf("no log to report")
+		return
+	}
+	t.log.Infof("reporting %d logs", len(logValues))
+
+	// TODO: fill the step request
+	stepRequest := &runnerv1.UpdateStepRequest{}
+	t.client.UpdateStep(ctx, stepRequest)
+}
+
+// reportSuccess reports the success of the task
+func (t *Task) reportSuccess(ctx context.Context) {
+	t.state = TaskStateSuccess
+	finishTask(t.BuildID)
+
+	t.log.Infof("task success")
+
+	if t.client == nil {
+		return
+	}
+
+	// TODO: fill the step request
+	stepRequest := &runnerv1.UpdateStepRequest{}
+	t.client.UpdateStep(ctx, stepRequest)
+}
+
+func (t *Task) Run(ctx context.Context) {
+	// get client for context, use for reporting
+	t.client = client.FromContext(ctx)
+	if t.client == nil {
+		t.log.Warnf("no client found in context")
+	} else {
+		t.log.Infof("client found in context")
+	}
+
 	workflowsPath, err := getWorkflowsPath(t.Input.repoDirectory)
 	if err != nil {
-		return err
+		t.reportFailure(ctx, err)
+		return
 	}
+	t.log.Debugf("workflows path: %s", workflowsPath)
+
 	planner, err := model.NewWorkflowPlanner(workflowsPath, false)
 	if err != nil {
-		return err
+		t.reportFailure(ctx, err)
+		return
 	}
 
 	var eventName string
@@ -124,7 +245,7 @@ func (t *Task) Run(ctx context.Context) error {
 	if len(events) > 0 {
 		// set default event type to first event
 		// this way user dont have to specify the event.
-		log.Debugf("Using detected workflow event: %s", events[0])
+		t.log.Debugf("Using detected workflow event: %s", events[0])
 		eventName = events[0]
 	} else {
 		if plan := planner.PlanEvent("push"); plan != nil {
@@ -134,18 +255,22 @@ func (t *Task) Run(ctx context.Context) error {
 
 	// build the plan for this run
 	var plan *model.Plan
-	jobID := t.JobID
+	jobID := ""
+	if t.BuildID > 0 {
+		jobID = fmt.Sprintf("%d", t.BuildID)
+	}
 	if jobID != "" {
-		log.Debugf("Planning job: %s", jobID)
+		t.log.Infof("Planning job: %s", jobID)
 		plan = planner.PlanJob(jobID)
 	} else {
-		log.Debugf("Planning event: %s", eventName)
+		t.log.Infof("Planning event: %s", eventName)
 		plan = planner.PlanEvent(eventName)
 	}
 
 	curDir, err := os.Getwd()
 	if err != nil {
-		return err
+		t.reportFailure(ctx, err)
+		return
 	}
 
 	// run the plan
@@ -182,21 +307,29 @@ func (t *Task) Run(ctx context.Context) error {
 	}
 	r, err := runner.New(config)
 	if err != nil {
-		return fmt.Errorf("new config failed: %v", err)
+		t.reportFailure(ctx, err)
+		return
 	}
 
 	cancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
+	t.log.Debugf("artifacts server started at %s:%s", input.artifactServerPath, input.artifactServerPort)
 
 	executor := r.NewPlanExecutor(plan).Finally(func(ctx context.Context) error {
 		cancel()
 		return nil
 	})
 
-	ctx = common.WithLoggerHook(ctx, t.LogHook)
+	t.log.Infof("workflow prepared")
+
+	// add logger recorders
+	ctx = common.WithLoggerHook(ctx, t.logHook)
+
+	go t.startReporting(1, ctx)
+
 	if err := executor(ctx); err != nil {
-		log.Warnf("workflow execution failed:%v, logs: %d", err, len(t.LogHook.entries))
-		return err
+		t.reportFailure(ctx, err)
+		return
 	}
-	log.Infof("workflow completed, logs: %d", len(t.LogHook.entries))
-	return nil
+
+	t.reportSuccess(ctx)
 }

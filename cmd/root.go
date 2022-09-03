@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"os"
+	"strconv"
 
 	"gitea.com/gitea/act_runner/engine"
 	"gitea.com/gitea/act_runner/runtime"
@@ -30,7 +31,7 @@ func initLogging(cfg Config) {
 }
 
 func Execute(ctx context.Context) {
-	task := runtime.NewTask()
+	task := runtime.NewTask(0)
 
 	// ./act_runner
 	rootCmd := &cobra.Command{
@@ -74,7 +75,8 @@ func runRoot(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command, a
 			log.WithError(err).Fatalln("failed to connect docker daemon engine")
 		}
 
-		task.JobID = jobID
-		return task.Run(ctx)
+		task.BuildID, _ = strconv.ParseInt(jobID, 10, 64)
+		task.Run(ctx)
+		return nil
 	}
 }

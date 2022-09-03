@@ -31,3 +31,23 @@ type Client interface {
 	// UpdateStep updates the build step.
 	UpdateStep(ctx context.Context, args *runnerv1.UpdateStepRequest) error
 }
+
+type contextKey string
+
+const clientContextKey = contextKey("gitea.rpc.client")
+
+// FromContext returns the client from the context.
+func FromContext(ctx context.Context) Client {
+	val := ctx.Value(clientContextKey)
+	if val != nil {
+		if c, ok := val.(Client); ok {
+			return c
+		}
+	}
+	return nil
+}
+
+// WithClient returns a new context with the given client.
+func WithClient(ctx context.Context, c Client) context.Context {
+	return context.WithValue(ctx, clientContextKey, c)
+}
