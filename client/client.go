@@ -25,29 +25,12 @@ type Client interface {
 	// Request requests the next available build stage for execution.
 	Request(ctx context.Context, args *runnerv1.RequestRequest) (*runnerv1.Stage, error)
 
+	// Detail fetches build details
+	Detail(ctx context.Context, args *runnerv1.DetailRequest) (*runnerv1.DetailResponse, error)
+
 	// Update updates the build stage.
 	Update(ctxt context.Context, args *runnerv1.UpdateRequest) error
 
 	// UpdateStep updates the build step.
 	UpdateStep(ctx context.Context, args *runnerv1.UpdateStepRequest) error
-}
-
-type contextKey string
-
-const clientContextKey = contextKey("gitea.rpc.client")
-
-// FromContext returns the client from the context.
-func FromContext(ctx context.Context) Client {
-	val := ctx.Value(clientContextKey)
-	if val != nil {
-		if c, ok := val.(Client); ok {
-			return c
-		}
-	}
-	return nil
-}
-
-// WithClient returns a new context with the given client.
-func WithClient(ctx context.Context, c Client) context.Context {
-	return context.WithValue(ctx, clientContextKey, c)
 }

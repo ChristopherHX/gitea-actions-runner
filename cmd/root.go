@@ -31,7 +31,7 @@ func initLogging(cfg Config) {
 }
 
 func Execute(ctx context.Context) {
-	task := runtime.NewTask(0)
+	task := runtime.NewTask(0, nil)
 
 	// ./act_runner
 	rootCmd := &cobra.Command{

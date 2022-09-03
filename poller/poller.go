@@ -94,12 +94,5 @@ func (p *Poller) poll(ctx context.Context, thread int) error {
 		return nil
 	}
 
-	// FIXME: for testing task
-	// stage.Id = 111
-	// stage.BuildId = 1222
-
-	// set client to context, so that the stage can use it to
-	ctx = client.WithClient(ctx, p.Client)
-
 	return p.Dispatch(ctx, stage)
 }

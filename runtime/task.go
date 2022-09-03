@@ -9,14 +9,13 @@ import (
 	"time"
 
 	"gitea.com/gitea/act_runner/client"
+	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
+
 	"github.com/nektos/act/pkg/artifacts"
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
-
-	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 )
 
 type TaskInput struct {
@@ -116,11 +115,11 @@ type Task struct {
 	logHook *taskLogHook
 	state   TaskState
 	client  client.Client
-	log     *logrus.Entry
+	log     *log.Entry
 }
 
 // newTask creates a new task
-func NewTask(buildID int64) *Task {
+func NewTask(buildID int64, client client.Client) *Task {
 	task := &Task{
 		Input: &TaskInput{
 			reuseContainers: true,
@@ -129,8 +128,8 @@ func NewTask(buildID int64) *Task {
 		BuildID: buildID,
 
 		state:   TaskStatePending,
-		client:  nil,
-		log:     logrus.WithField("buildID", buildID),
+		client:  client,
+		log:     log.WithField("buildID", buildID),
 		logHook: &taskLogHook{},
 	}
 	task.Input.repoDirectory, _ = os.Getwd()
@@ -168,13 +167,12 @@ func (t *Task) reportFailure(ctx context.Context, err error) {
 	if t.client == nil {
 		// TODO: fill the step request
 		stepRequest := &runnerv1.UpdateStepRequest{}
-		t.client.UpdateStep(ctx, stepRequest)
+		_ = t.client.UpdateStep(ctx, stepRequest)
 		return
 	}
-
 }
 
-func (t *Task) startReporting(interval int64, ctx context.Context) {
+func (t *Task) startReporting(ctx context.Context, interval int64) {
 	for {
 		time.Sleep(time.Duration(interval) * time.Second)
 		if t.state == TaskStateSuccess || t.state == TaskStateFailure {
@@ -199,7 +197,7 @@ func (t *Task) reportStep(ctx context.Context) {
 
 	// TODO: fill the step request
 	stepRequest := &runnerv1.UpdateStepRequest{}
-	t.client.UpdateStep(ctx, stepRequest)
+	_ = t.client.UpdateStep(ctx, stepRequest)
 }
 
 // reportSuccess reports the success of the task
@@ -215,18 +213,10 @@ func (t *Task) reportSuccess(ctx context.Context) {
 
 	// TODO: fill the step request
 	stepRequest := &runnerv1.UpdateStepRequest{}
-	t.client.UpdateStep(ctx, stepRequest)
+	_ = t.client.UpdateStep(ctx, stepRequest)
 }
 
 func (t *Task) Run(ctx context.Context) {
-	// get client for context, use for reporting
-	t.client = client.FromContext(ctx)
-	if t.client == nil {
-		t.log.Warnf("no client found in context")
-	} else {
-		t.log.Infof("client found in context")
-	}
-
 	workflowsPath, err := getWorkflowsPath(t.Input.repoDirectory)
 	if err != nil {
 		t.reportFailure(ctx, err)
@@ -324,7 +314,7 @@ func (t *Task) Run(ctx context.Context) {
 	// add logger recorders
 	ctx = common.WithLoggerHook(ctx, t.logHook)
 
-	go t.startReporting(1, ctx)
+	go t.startReporting(ctx, 1)
 
 	if err := executor(ctx); err != nil {
 		t.reportFailure(ctx, err)

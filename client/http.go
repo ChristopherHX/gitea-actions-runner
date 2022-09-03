@@ -153,3 +153,22 @@ func (p *HTTPClient) UpdateStep(ctx context.Context, arg *runnerv1.UpdateStepReq
 
 	return err
 }
+
+// Detail fetches build details
+func (p *HTTPClient) Detail(ctx context.Context, arg *runnerv1.DetailRequest) (*runnerv1.DetailResponse, error) {
+	client := runnerv1connect.NewRunnerServiceClient(
+		p.Client,
+		p.Endpoint,
+		p.opts...,
+	)
+	req := connect.NewRequest(arg)
+	req.Header().Set("X-Runner-Token", p.Secret)
+
+	resp, err := client.Detail(ctx, req)
+
+	return &runnerv1.DetailResponse{
+		Repo:  resp.Msg.Repo,
+		Build: resp.Msg.Build,
+		Stage: resp.Msg.Stage,
+	}, err
+}

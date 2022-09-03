@@ -2,11 +2,12 @@ package runtime
 
 import (
 	"context"
+	"fmt"
 
 	"gitea.com/gitea/act_runner/client"
 	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // Defines the Resource Kind and Type.
@@ -24,12 +25,45 @@ type Runner struct {
 
 // Run runs the pipeline stage.
 func (s *Runner) Run(ctx context.Context, stage *runnerv1.Stage) error {
-	l := logrus.
-		WithField("runner.ID", stage.Id).
-		WithField("runner.BuildID", stage.BuildId)
+	l := log.
+		WithField("stage.id", stage.Id).
+		WithField("stage.name", stage.Name)
 
 	l.Info("start running pipeline")
 
-	// TODO: use ctx to transfer usage information
-	return startTask(stage.BuildId, ctx)
+	// update machine in stage
+	stage.Machine = s.Machine
+	data, err := s.Client.Detail(ctx, &runnerv1.DetailRequest{
+		Stage: stage,
+	})
+	if err != nil {
+		l.Debug("stage accepted by another runner")
+		return nil
+	}
+
+	l = log.WithField("repo.id", data.Repo.Id).
+		WithField("repo.name", data.Repo.Name).
+		WithField("build.id", data.Build.Id).
+		WithField("build.name", data.Build.Name)
+
+	l.Info("stage details fetched")
+
+	return s.run(ctx, data)
+}
+
+func (s *Runner) run(ctx context.Context, data *runnerv1.DetailResponse) error {
+	_, exist := globalTaskMap.Load(data.Build.Id)
+	if exist {
+		return fmt.Errorf("task %d already exists", data.Build.Id)
+	}
+
+	task := NewTask(data.Build.Id, s.Client)
+
+	// set task ve to global map
+	// when task is done or canceled, it will be removed from the map
+	globalTaskMap.Store(data.Build.Id, task)
+
+	go task.Run(ctx)
+
+	return nil
 }
