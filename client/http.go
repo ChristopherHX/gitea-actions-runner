@@ -31,7 +31,7 @@ func New(endpoint, secret string, skipverify bool, opts ...Option) *HTTPClient {
 	}
 
 	client.Client = &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 1 * time.Minute,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},

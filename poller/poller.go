@@ -53,7 +53,8 @@ func (p *Poller) Poll(ctx context.Context, n int) error {
 							return
 						}
 						if err := p.poll(ctx, i+1); err != nil {
-							log.WithError(err).Error("poll error")
+							log.WithField("thread", i+1).
+								WithError(err).Error("poll error")
 						}
 					}
 				}
@@ -65,10 +66,11 @@ func (p *Poller) Poll(ctx context.Context, n int) error {
 }
 
 func (p *Poller) poll(ctx context.Context, thread int) error {
-	log.WithField("thread", thread).Info("poller: request stage from remote server")
+	logger := log.WithField("thread", thread)
+	logger.Info("poller: request stage from remote server")
 
-	// TODO: fetch the job from remote server
-	time.Sleep(time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 
 	// request a new build stage for execution from the central
 	// build server.
@@ -79,11 +81,10 @@ func (p *Poller) poll(ctx context.Context, thread int) error {
 		Type: p.Filter.Type,
 	})
 	if err == context.Canceled || err == context.DeadlineExceeded {
-		log.WithError(err).Trace("poller: no stage returned")
+		logger.WithError(err).Trace("poller: no stage returned")
 		return nil
 	}
 	if err != nil {
-		log.WithError(err).Error("poller: cannot request stage")
 		return err
 	}
 
