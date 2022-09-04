@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"gitea.com/gitea/act_runner/client"
@@ -9,6 +10,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 )
+
+var ErrDataLock = errors.New("Data Lock Error")
 
 // Defines the Resource Kind and Type.
 const (
@@ -36,9 +39,13 @@ func (s *Runner) Run(ctx context.Context, stage *runnerv1.Stage) error {
 	data, err := s.Client.Detail(ctx, &runnerv1.DetailRequest{
 		Stage: stage,
 	})
-	if err != nil {
-		l.Debug("stage accepted by another runner")
+	if err != nil && err == ErrDataLock {
+		l.Info("stage accepted by another runner")
 		return nil
+	}
+	if err != nil {
+		l.WithError(err).Error("cannot accept stage")
+		return err
 	}
 
 	l = log.WithField("repo.id", data.Repo.Id).
