@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"gitea.com/gitea/act_runner/client"
 	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
@@ -59,18 +58,5 @@ func (s *Runner) Run(ctx context.Context, stage *runnerv1.Stage) error {
 }
 
 func (s *Runner) run(ctx context.Context, data *runnerv1.DetailResponse) error {
-	_, exist := globalTaskMap.Load(data.Build.Id)
-	if exist {
-		return fmt.Errorf("task %d already exists", data.Build.Id)
-	}
-
-	task := NewTask(data.Build.Id, s.Client)
-
-	// set task ve to global map
-	// when task is done or canceled, it will be removed from the map
-	globalTaskMap.Store(data.Build.Id, task)
-
-	go task.Run(ctx)
-
-	return nil
+	return NewTask(data.Build.Id, s.Client).Run(ctx, data)
 }

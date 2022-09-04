@@ -76,7 +76,7 @@ func runRoot(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command, a
 		}
 
 		task.BuildID, _ = strconv.ParseInt(jobID, 10, 64)
-		task.Run(ctx)
+		task.Run(ctx, nil)
 		return nil
 	}
 }

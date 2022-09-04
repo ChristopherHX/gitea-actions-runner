@@ -216,18 +216,27 @@ func (t *Task) reportSuccess(ctx context.Context) {
 	_ = t.client.UpdateStep(ctx, stepRequest)
 }
 
-func (t *Task) Run(ctx context.Context) {
+func (t *Task) Run(ctx context.Context, data *runnerv1.DetailResponse) error {
+	_, exist := globalTaskMap.Load(data.Build.Id)
+	if exist {
+		return fmt.Errorf("task %d already exists", data.Build.Id)
+	}
+
+	// set task ve to global map
+	// when task is done or canceled, it will be removed from the map
+	globalTaskMap.Store(data.Build.Id, t)
+
 	workflowsPath, err := getWorkflowsPath(t.Input.repoDirectory)
 	if err != nil {
 		t.reportFailure(ctx, err)
-		return
+		return err
 	}
 	t.log.Debugf("workflows path: %s", workflowsPath)
 
 	planner, err := model.NewWorkflowPlanner(workflowsPath, false)
 	if err != nil {
 		t.reportFailure(ctx, err)
-		return
+		return err
 	}
 
 	var eventName string
@@ -260,7 +269,7 @@ func (t *Task) Run(ctx context.Context) {
 	curDir, err := os.Getwd()
 	if err != nil {
 		t.reportFailure(ctx, err)
-		return
+		return err
 	}
 
 	// run the plan
@@ -298,7 +307,7 @@ func (t *Task) Run(ctx context.Context) {
 	r, err := runner.New(config)
 	if err != nil {
 		t.reportFailure(ctx, err)
-		return
+		return err
 	}
 
 	cancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
@@ -318,8 +327,9 @@ func (t *Task) Run(ctx context.Context) {
 
 	if err := executor(ctx); err != nil {
 		t.reportFailure(ctx, err)
-		return
+		return err
 	}
 
 	t.reportSuccess(ctx)
+	return nil
 }
