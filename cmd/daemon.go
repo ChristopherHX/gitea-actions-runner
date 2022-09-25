@@ -9,6 +9,8 @@ import (
 	"gitea.com/gitea/act_runner/poller"
 	"gitea.com/gitea/act_runner/runtime"
 
+	pingv1 "gitea.com/gitea/proto-go/ping/v1"
+	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -37,13 +39,15 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 		cli := client.New(
 			cfg.Client.Address,
 			cfg.Client.Secret,
-			cfg.Client.SkipVerify,
+			client.WithSkipVerify(cfg.Client.SkipVerify),
 			client.WithGRPC(cfg.Client.GRPC),
 			client.WithGRPCWeb(cfg.Client.GRPCWeb),
 		)
 
 		for {
-			err := cli.Ping(ctx, cfg.Runner.Name)
+			_, err := cli.Ping(ctx, connect.NewRequest(&pingv1.PingRequest{
+				Data: cfg.Runner.Name,
+			}))
 			select {
 			case <-ctx.Done():
 				return nil

@@ -7,10 +7,11 @@ import (
 	"gitea.com/gitea/act_runner/client"
 	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 
+	"github.com/bufbuild/connect-go"
 	log "github.com/sirupsen/logrus"
 )
 
-func New(cli client.Client, dispatch func(context.Context, *runnerv1.Stage) error, filter *client.Filter) *Poller {
+func New(cli client.Client, dispatch func(context.Context, *runnerv1.Task) error, filter *client.Filter) *Poller {
 	return &Poller{
 		Client:       cli,
 		Filter:       filter,
@@ -22,18 +23,18 @@ func New(cli client.Client, dispatch func(context.Context, *runnerv1.Stage) erro
 type Poller struct {
 	Client   client.Client
 	Filter   *client.Filter
-	Dispatch func(context.Context, *runnerv1.Stage) error
+	Dispatch func(context.Context, *runnerv1.Task) error
 
 	routineGroup *routineGroup
 }
 
 func (p *Poller) Poll(ctx context.Context, n int) error {
 	// register new runner.
-	_, err := p.Client.Register(ctx, &runnerv1.RegisterRequest{
+	_, err := p.Client.Register(ctx, connect.NewRequest(&runnerv1.RegisterRequest{
 		Os:       p.Filter.OS,
 		Arch:     p.Filter.Arch,
 		Capacity: int64(p.Filter.Capacity),
-	})
+	}))
 	if err != nil {
 		log.WithError(err).Error("poller: cannot register new runner")
 		return err
@@ -74,12 +75,12 @@ func (p *Poller) poll(ctx context.Context, thread int) error {
 
 	// request a new build stage for execution from the central
 	// build server.
-	stage, err := p.Client.Request(ctx, &runnerv1.RequestRequest{
+	resp, err := p.Client.Request(ctx, connect.NewRequest(&runnerv1.RequestRequest{
 		Kind: p.Filter.Kind,
 		Os:   p.Filter.OS,
 		Arch: p.Filter.Arch,
 		Type: p.Filter.Type,
-	})
+	}))
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		logger.WithError(err).Trace("poller: no stage returned")
 		return nil
@@ -90,9 +91,9 @@ func (p *Poller) poll(ctx context.Context, thread int) error {
 
 	// exit if a nil or empty stage is returned from the system
 	// and allow the runner to retry.
-	if stage == nil || stage.Id == 0 {
+	if resp.Msg.Task == nil || resp.Msg.Task.Id == 0 {
 		return nil
 	}
 
-	return p.Dispatch(ctx, stage)
+	return p.Dispatch(ctx, resp.Msg.Task)
 }

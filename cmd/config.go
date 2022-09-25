@@ -20,7 +20,7 @@ type (
 			Host       string `envconfig:"GITEA_RPC_HOST"   required:"true"`
 			Secret     string `envconfig:"GITEA_RPC_SECRET" required:"true"`
 			SkipVerify bool   `envconfig:"GITEA_RPC_SKIP_VERIFY"`
-			GRPC       bool   `envconfig:"GITEA_RPC_GRPC"`
+			GRPC       bool   `envconfig:"GITEA_RPC_GRPC" default:"true"`
 			GRPCWeb    bool   `envconfig:"GITEA_RPC_GRPC_WEB"`
 		}
 

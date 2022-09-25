@@ -1,12 +1,12 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
-	"time"
 
 	"gitea.com/gitea/act_runner/client"
 	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
@@ -57,38 +57,6 @@ type TaskInput struct {
 	EnvFile       string
 }
 
-type taskLogHook struct {
-	entries []*log.Entry
-	lock    sync.Mutex
-}
-
-func (h *taskLogHook) Levels() []log.Level {
-	return log.AllLevels
-}
-
-func (h *taskLogHook) Fire(entry *log.Entry) error {
-	if flag, ok := entry.Data["raw_output"]; ok {
-		h.lock.Lock()
-		if flagVal, ok := flag.(bool); flagVal && ok {
-			log.Infof("task log: %s", entry.Message)
-			h.entries = append(h.entries, entry)
-		}
-		h.lock.Unlock()
-	}
-	return nil
-}
-
-func (h *taskLogHook) swapLogs() []*log.Entry {
-	if len(h.entries) == 0 {
-		return nil
-	}
-	h.lock.Lock()
-	entries := h.entries
-	h.entries = nil
-	h.lock.Unlock()
-	return entries
-}
-
 type TaskState int
 
 const (
@@ -112,13 +80,12 @@ type Task struct {
 	BuildID int64
 	Input   *TaskInput
 
-	logHook *taskLogHook
-	state   TaskState
-	client  client.Client
-	log     *log.Entry
+	state  TaskState
+	client client.Client
+	log    *log.Entry
 }
 
-// newTask creates a new task
+// NewTask creates a new task
 func NewTask(buildID int64, client client.Client) *Task {
 	task := &Task{
 		Input: &TaskInput{
@@ -127,10 +94,9 @@ func NewTask(buildID int64, client client.Client) *Task {
 		},
 		BuildID: buildID,
 
-		state:   TaskStatePending,
-		client:  client,
-		log:     log.WithField("buildID", buildID),
-		logHook: &taskLogHook{},
+		state:  TaskStatePending,
+		client: client,
+		log:    log.WithField("buildID", buildID),
 	}
 	task.Input.repoDirectory, _ = os.Getwd()
 	return task
@@ -157,139 +123,96 @@ func demoPlatforms() map[string]string {
 	}
 }
 
-// reportFailure reports the failure of the task
-func (t *Task) reportFailure(ctx context.Context, err error) {
-	t.state = TaskStateFailure
-	finishTask(t.BuildID)
-
-	t.log.Errorf("task failed: %v", err)
-
-	if t.client == nil {
-		// TODO: fill the step request
-		stepRequest := &runnerv1.UpdateStepRequest{}
-		_ = t.client.UpdateStep(ctx, stepRequest)
-		return
-	}
-}
-
-func (t *Task) startReporting(ctx context.Context, interval int64) {
-	for {
-		time.Sleep(time.Duration(interval) * time.Second)
-		if t.state == TaskStateSuccess || t.state == TaskStateFailure {
-			t.log.Debugf("task reporting stopped")
-			break
-		}
-		t.reportStep(ctx)
-	}
-}
-
-// reportStep reports the step of the task
-func (t *Task) reportStep(ctx context.Context) {
-	if t.client == nil {
-		return
-	}
-	logValues := t.logHook.swapLogs()
-	if len(logValues) == 0 {
-		t.log.Debugf("no log to report")
-		return
-	}
-	t.log.Infof("reporting %d logs", len(logValues))
-
-	// TODO: fill the step request
-	stepRequest := &runnerv1.UpdateStepRequest{}
-	_ = t.client.UpdateStep(ctx, stepRequest)
-}
-
-// reportSuccess reports the success of the task
-func (t *Task) reportSuccess(ctx context.Context) {
-	t.state = TaskStateSuccess
-	finishTask(t.BuildID)
-
-	t.log.Infof("task success")
-
-	if t.client == nil {
-		return
-	}
-
-	// TODO: fill the step request
-	stepRequest := &runnerv1.UpdateStepRequest{}
-	_ = t.client.UpdateStep(ctx, stepRequest)
-}
-
-func (t *Task) Run(ctx context.Context, data *runnerv1.DetailResponse) error {
-	_, exist := globalTaskMap.Load(data.Build.Id)
+func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
+	_, exist := globalTaskMap.Load(task.Id)
 	if exist {
-		return fmt.Errorf("task %d already exists", data.Build.Id)
+		return fmt.Errorf("task %d already exists", task.Id)
 	}
 
 	// set task ve to global map
 	// when task is done or canceled, it will be removed from the map
-	globalTaskMap.Store(data.Build.Id, t)
+	globalTaskMap.Store(task.Id, t)
+	defer globalTaskMap.Delete(task.Id)
+
+	lastWords := ""
+	reporter := NewReporter(ctx, t.client, task.Id)
+	defer func() {
+		_ = reporter.Close(lastWords)
+	}()
+	reporter.RunDaemon()
+
+	reporter.Logf("received task %v of job %v", task.Id, task.Context.Fields["job"].GetStringValue())
 
 	workflowsPath, err := getWorkflowsPath(t.Input.repoDirectory)
 	if err != nil {
-		t.reportFailure(ctx, err)
+		lastWords = err.Error()
 		return err
 	}
 	t.log.Debugf("workflows path: %s", workflowsPath)
 
-	planner, err := model.NewWorkflowPlanner(workflowsPath, false)
+	workflow, err := model.ReadWorkflow(bytes.NewReader(task.WorkflowPayload))
 	if err != nil {
-		t.reportFailure(ctx, err)
+		lastWords = err.Error()
 		return err
 	}
 
-	var eventName string
-	events := planner.GetEvents()
-	if len(events) > 0 {
-		// set default event type to first event
-		// this way user dont have to specify the event.
-		t.log.Debugf("Using detected workflow event: %s", events[0])
-		eventName = events[0]
+	var plan *model.Plan
+	if jobIDs := workflow.GetJobIDs(); len(jobIDs) != 1 {
+		err := fmt.Errorf("multiple jobs fould: %v", jobIDs)
+		lastWords = err.Error()
+		return err
 	} else {
-		if plan := planner.PlanEvent("push"); plan != nil {
-			eventName = "push"
-		}
+		jobID := jobIDs[0]
+		plan = model.CombineWorkflowPlanner(workflow).PlanJob(jobID)
+
+		job := workflow.GetJob(jobID)
+		reporter.ResetSteps(len(job.Steps))
 	}
 
-	// build the plan for this run
-	var plan *model.Plan
-	jobID := ""
-	if t.BuildID > 0 {
-		jobID = fmt.Sprintf("%d", t.BuildID)
-	}
-	if jobID != "" {
-		t.log.Infof("Planning job: %s", jobID)
-		plan = planner.PlanJob(jobID)
-	} else {
-		t.log.Infof("Planning event: %s", eventName)
-		plan = planner.PlanEvent(eventName)
-	}
+	log.Infof("plan: %+v", plan.Stages[0].Runs)
 
 	curDir, err := os.Getwd()
 	if err != nil {
-		t.reportFailure(ctx, err)
+		lastWords = err.Error()
 		return err
 	}
 
-	// run the plan
+	dataContext := task.Context.Fields
+	preset := &model.GithubContext{
+		Event:           dataContext["event"].GetStructValue().AsMap(),
+		RunID:           dataContext["run_id"].GetStringValue(),
+		RunNumber:       dataContext["run_number"].GetStringValue(),
+		Actor:           dataContext["actor"].GetStringValue(),
+		Repository:      dataContext["repository"].GetStringValue(),
+		EventName:       dataContext["event_name"].GetStringValue(),
+		Sha:             dataContext["sha"].GetStringValue(),
+		Ref:             dataContext["ref"].GetStringValue(),
+		RefName:         dataContext["ref_name"].GetStringValue(),
+		RefType:         dataContext["ref_type"].GetStringValue(),
+		HeadRef:         dataContext["head_ref"].GetStringValue(),
+		BaseRef:         dataContext["base_ref"].GetStringValue(),
+		Token:           dataContext["token"].GetStringValue(),
+		RepositoryOwner: dataContext["repository_owner"].GetStringValue(),
+		RetentionDays:   dataContext["retention_days"].GetStringValue(),
+	}
+	eventJSON, err := json.Marshal(preset.Event)
+	if err != nil {
+		lastWords = err.Error()
+		return err
+	}
+
 	input := t.Input
 	config := &runner.Config{
-		Actor:           input.actor,
-		EventName:       eventName,
-		EventPath:       "",
-		DefaultBranch:   "",
-		ForcePull:       input.forcePull,
-		ForceRebuild:    input.forceRebuild,
-		ReuseContainers: input.reuseContainers,
-		Workdir:         curDir,
-		BindWorkdir:     input.bindWorkdir,
-		LogOutput:       true,
-		JSONLogger:      input.jsonLogger,
-		// Env:                   envs,
-		// Secrets:               secrets,
+		Workdir:               curDir, // TODO: temp dir?
+		BindWorkdir:           input.bindWorkdir,
+		ReuseContainers:       input.reuseContainers,
+		ForcePull:             input.forcePull,
+		ForceRebuild:          input.forceRebuild,
+		LogOutput:             true,
+		JSONLogger:            input.jsonLogger,
+		Secrets:               task.Secrets,
 		InsecureSecrets:       input.insecureSecrets,
-		Platforms:             demoPlatforms(),
+		Platforms:             demoPlatforms(), // TODO: supported platforms
 		Privileged:            input.privileged,
 		UsernsMode:            input.usernsMode,
 		ContainerArchitecture: input.containerArchitecture,
@@ -302,11 +225,12 @@ func (t *Task) Run(ctx context.Context, data *runnerv1.DetailResponse) error {
 		ArtifactServerPath:    input.artifactServerPath,
 		ArtifactServerPort:    input.artifactServerPort,
 		NoSkipCheckout:        input.noSkipCheckout,
-		// RemoteName:            input.remoteName,
+		PresetGitHubContext:   preset,
+		EventJSON:             string(eventJSON),
 	}
 	r, err := runner.New(config)
 	if err != nil {
-		t.reportFailure(ctx, err)
+		lastWords = err.Error()
 		return err
 	}
 
@@ -319,17 +243,15 @@ func (t *Task) Run(ctx context.Context, data *runnerv1.DetailResponse) error {
 	})
 
 	t.log.Infof("workflow prepared")
+	reporter.Logf("workflow prepared")
 
 	// add logger recorders
-	ctx = common.WithLoggerHook(ctx, t.logHook)
-
-	go t.startReporting(ctx, 1)
+	ctx = common.WithLoggerHook(ctx, reporter)
 
 	if err := executor(ctx); err != nil {
-		t.reportFailure(ctx, err)
+		lastWords = err.Error()
 		return err
 	}
 
-	t.reportSuccess(ctx)
 	return nil
 }
