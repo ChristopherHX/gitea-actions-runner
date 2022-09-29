@@ -79,8 +79,6 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 			cli,
 			runner.Run,
 			&client.Filter{
-				Kind:     runtime.Kind,
-				Type:     runtime.Type,
 				OS:       cfg.Platform.OS,
 				Arch:     cfg.Platform.Arch,
 				Capacity: cfg.Runner.Capacity,

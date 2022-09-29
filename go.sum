@@ -27,6 +27,8 @@ gitea.com/gitea/act v0.0.0-20220922135643-52a5bba9e7fa h1:HHqlvfIvqFlny3sgJgAM1B
 gitea.com/gitea/act v0.0.0-20220922135643-52a5bba9e7fa/go.mod h1:9W/Nz16tjfnWp7O5DUo3EjZBnZFBI/5rlWstX4o7+hU=
 gitea.com/gitea/proto-go v0.0.0-20220925101213-1ac8a05257e1 h1:JGApntYc07jawNxrxv1WhU6IHX0i73nqhloZlaUR5Nc=
 gitea.com/gitea/proto-go v0.0.0-20220925101213-1ac8a05257e1/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
+gitea.com/gitea/proto-go v0.0.0-20220929140437-812ae50fdce4 h1:HW38qGi3yd/7eUk8ihkz+opF6YGb1uLn8d1ZCUaxNg8=
+gitea.com/gitea/proto-go v0.0.0-20220929140437-812ae50fdce4/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
 github.com/Azure/azure-sdk-for-go v16.2.1+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 h1:w+iIsaOQNcT7OZ575w+acHgRric5iCyQh+xv+KJ4HB8=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78/go.mod h1:LmzpDX56iTiv29bbRTIsUNlaFfuhWRQBWjQdVyAevI8=

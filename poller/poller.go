@@ -2,6 +2,7 @@ package poller
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"gitea.com/gitea/act_runner/client"
@@ -10,6 +11,8 @@ import (
 	"github.com/bufbuild/connect-go"
 	log "github.com/sirupsen/logrus"
 )
+
+var ErrDataLock = errors.New("Data Lock Error")
 
 func New(cli client.Client, dispatch func(context.Context, *runnerv1.Task) error, filter *client.Filter) *Poller {
 	return &Poller{
@@ -67,25 +70,32 @@ func (p *Poller) Poll(ctx context.Context, n int) error {
 }
 
 func (p *Poller) poll(ctx context.Context, thread int) error {
-	logger := log.WithField("thread", thread)
-	logger.Info("poller: request stage from remote server")
+	l := log.WithField("thread", thread)
+	l.Info("poller: request stage from remote server")
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	// request a new build stage for execution from the central
 	// build server.
-	resp, err := p.Client.Request(ctx, connect.NewRequest(&runnerv1.RequestRequest{
+	resp, err := p.Client.FetchTask(ctx, connect.NewRequest(&runnerv1.FetchTaskRequest{
 		Kind: p.Filter.Kind,
 		Os:   p.Filter.OS,
 		Arch: p.Filter.Arch,
 		Type: p.Filter.Type,
 	}))
 	if err == context.Canceled || err == context.DeadlineExceeded {
-		logger.WithError(err).Trace("poller: no stage returned")
+		l.WithError(err).Trace("poller: no stage returned")
 		return nil
 	}
+
+	if err != nil && err == ErrDataLock {
+		l.WithError(err).Info("task accepted by another runner")
+		return nil
+	}
+
 	if err != nil {
+		l.WithError(err).Error("cannot accept task")
 		return err
 	}
 
