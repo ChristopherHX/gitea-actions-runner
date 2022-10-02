@@ -6,11 +6,9 @@ import (
 )
 
 type Filter struct {
-	Kind     string `json:"kind"`
-	Type     string `json:"type"`
-	OS       string `json:"os"`
-	Arch     string `json:"arch"`
-	Capacity int    `json:"capacity"`
+	OS     string   `json:"os"`
+	Arch   string   `json:"arch"`
+	Labels []string `json:"labels"`
 }
 
 // A Client manages communication with the runner.

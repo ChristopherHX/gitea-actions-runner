@@ -2,12 +2,16 @@ package poller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
 	"time"
 
 	"gitea.com/gitea/act_runner/client"
+	"gitea.com/gitea/act_runner/config"
 	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 
+	"github.com/appleboy/com/file"
 	"github.com/bufbuild/connect-go"
 	log "github.com/sirupsen/logrus"
 )
@@ -31,18 +35,50 @@ type Poller struct {
 	routineGroup *routineGroup
 }
 
-func (p *Poller) Poll(ctx context.Context, n int) error {
+type runner struct {
+	id    int64
+	uuid  string
+	name  string
+	token string
+}
+
+func (p *Poller) Register(ctx context.Context, cfg config.Runner) error {
+	// check .runner config exist
+	if file.IsFile(".runner") {
+		return nil
+	}
+
 	// register new runner.
-	_, err := p.Client.Register(ctx, connect.NewRequest(&runnerv1.RegisterRequest{
-		Os:       p.Filter.OS,
-		Arch:     p.Filter.Arch,
-		Capacity: int64(p.Filter.Capacity),
+	resp, err := p.Client.Register(ctx, connect.NewRequest(&runnerv1.RegisterRequest{
+		Os:     p.Filter.OS,
+		Arch:   p.Filter.Arch,
+		Labels: p.Filter.Labels,
+		Name:   cfg.Name,
+		Token:  cfg.Token,
 	}))
 	if err != nil {
 		log.WithError(err).Error("poller: cannot register new runner")
 		return err
 	}
 
+	data := &runner{
+		id:    resp.Msg.Runner.Id,
+		uuid:  resp.Msg.Runner.Uuid,
+		name:  resp.Msg.Runner.Name,
+		token: resp.Msg.Runner.Token,
+	}
+
+	file, err := json.MarshalIndent(data, "", " ")
+	if err != nil {
+		log.WithError(err).Error("poller: cannot marshal the json input")
+		return err
+	}
+
+	// store runner config in .runner file
+	return os.WriteFile(".runner", file, 0o644)
+}
+
+func (p *Poller) Poll(ctx context.Context, n int) error {
 	for i := 0; i < n; i++ {
 		func(i int) {
 			p.routineGroup.Run(func() {
@@ -79,10 +115,8 @@ func (p *Poller) poll(ctx context.Context, thread int) error {
 	// request a new build stage for execution from the central
 	// build server.
 	resp, err := p.Client.FetchTask(ctx, connect.NewRequest(&runnerv1.FetchTaskRequest{
-		Kind: p.Filter.Kind,
 		Os:   p.Filter.OS,
 		Arch: p.Filter.Arch,
-		Type: p.Filter.Type,
 	}))
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		l.WithError(err).Trace("poller: no stage returned")

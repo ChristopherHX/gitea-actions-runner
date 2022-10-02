@@ -25,10 +25,8 @@ cloud.google.com/go/storage v1.6.0/go.mod h1:N7U0C8pVQ/+NIKOBQyamJIeKQKkZ+mxpohl
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 gitea.com/gitea/act v0.0.0-20220922135643-52a5bba9e7fa h1:HHqlvfIvqFlny3sgJgAM1BYeLNr1uM4yXtvF7aAoYK8=
 gitea.com/gitea/act v0.0.0-20220922135643-52a5bba9e7fa/go.mod h1:9W/Nz16tjfnWp7O5DUo3EjZBnZFBI/5rlWstX4o7+hU=
-gitea.com/gitea/proto-go v0.0.0-20220925101213-1ac8a05257e1 h1:JGApntYc07jawNxrxv1WhU6IHX0i73nqhloZlaUR5Nc=
-gitea.com/gitea/proto-go v0.0.0-20220925101213-1ac8a05257e1/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
-gitea.com/gitea/proto-go v0.0.0-20220929140437-812ae50fdce4 h1:HW38qGi3yd/7eUk8ihkz+opF6YGb1uLn8d1ZCUaxNg8=
-gitea.com/gitea/proto-go v0.0.0-20220929140437-812ae50fdce4/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
+gitea.com/gitea/proto-go v0.0.0-20221002020351-750a3b99a850 h1:BDnr9A52zCPb5BH64yTm8cIfhhjTvql0u6QvWjJViGo=
+gitea.com/gitea/proto-go v0.0.0-20221002020351-750a3b99a850/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
 github.com/Azure/azure-sdk-for-go v16.2.1+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 h1:w+iIsaOQNcT7OZ575w+acHgRric5iCyQh+xv+KJ4HB8=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78/go.mod h1:LmzpDX56iTiv29bbRTIsUNlaFfuhWRQBWjQdVyAevI8=
@@ -89,6 +87,8 @@ github.com/alexflint/go-filemutex v0.0.0-20171022225611-72bdc8eae2ae/go.mod h1:C
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239 h1:kFOfPq6dUM1hTo4JG6LR5AXSUEsOjtdm0kw0FtQtMJA=
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239/go.mod h1:2FmKhYUyUczH0OGQWaF5ceTx0UBShxjsH6f8oGKYe2c=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
+github.com/appleboy/com v0.1.6 h1:vP9ryTIbSFaXSrZcFTU7RRcgPbrpGJ0Oy5wpgEkQ2m8=
+github.com/appleboy/com v0.1.6/go.mod h1:jnufjIC3opMlReyPPPye+8JqNvUzLm25o7h6SOy8nv0=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=

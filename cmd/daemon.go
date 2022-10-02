@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gitea.com/gitea/act_runner/client"
+	"gitea.com/gitea/act_runner/config"
 	"gitea.com/gitea/act_runner/engine"
 	"gitea.com/gitea/act_runner/poller"
 	"gitea.com/gitea/act_runner/runtime"
@@ -22,7 +23,7 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 		log.Infoln("Starting runner daemon")
 
 		_ = godotenv.Load(task.Input.EnvFile)
-		cfg, err := fromEnviron()
+		cfg, err := config.FromEnviron()
 		if err != nil {
 			log.WithError(err).
 				Fatalln("invalid configuration")
@@ -79,9 +80,9 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 			cli,
 			runner.Run,
 			&client.Filter{
-				OS:       cfg.Platform.OS,
-				Arch:     cfg.Platform.Arch,
-				Capacity: cfg.Runner.Capacity,
+				OS:     cfg.Platform.OS,
+				Arch:   cfg.Platform.Arch,
+				Labels: cfg.Runner.Labels,
 			},
 		)
 
@@ -91,6 +92,11 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 				WithField("os", cfg.Platform.OS).
 				WithField("arch", cfg.Platform.Arch).
 				Infoln("polling the remote server")
+
+			// register new runner
+			if err := poller.Register(ctx, cfg.Runner); err != nil {
+				return err
+			}
 
 			return poller.Poll(ctx, cfg.Runner.Capacity)
 		})
