@@ -50,11 +50,11 @@ func (p *Poller) Register(ctx context.Context, cfg config.Runner) error {
 
 	// register new runner.
 	resp, err := p.Client.Register(ctx, connect.NewRequest(&runnerv1.RegisterRequest{
-		Os:     p.Filter.OS,
-		Arch:   p.Filter.Arch,
-		Labels: p.Filter.Labels,
-		Name:   cfg.Name,
-		Token:  cfg.Token,
+		Name:         cfg.Name,
+		Token:        cfg.Token,
+		Url:          cfg.URL,
+		AgentLabels:  []string{p.Filter.OS, p.Filter.Arch},
+		CustomLabels: p.Filter.Labels,
 	}))
 	if err != nil {
 		log.WithError(err).Error("poller: cannot register new runner")

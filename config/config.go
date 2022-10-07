@@ -32,8 +32,8 @@ type (
 
 	Runner struct {
 		Name     string            `envconfig:"GITEA_RUNNER_NAME"`
-		URL      string            `envconfig:"GITEA_URL" required:"true"`
-		Token    string            `envconfig:"GITEA_TOKEN" required:"true"`
+		URL      string            `envconfig:"GITEA_RUNNER_URL" required:"true"`
+		Token    string            `envconfig:"GITEA_RUNNER_TOKEN" required:"true"`
 		Capacity int               `envconfig:"GITEA_RUNNER_CAPACITY" default:"1"`
 		Environ  map[string]string `envconfig:"GITEA_RUNNER_ENVIRON"`
 		EnvFile  string            `envconfig:"GITEA_RUNNER_ENV_FILE"`
