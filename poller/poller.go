@@ -16,7 +16,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var ErrDataLock = errors.New("Data Lock Error")
+var (
+	ErrDataLock   = errors.New("Data Lock Error")
+	defaultLabels = []string{"self-hosted"}
+)
 
 func New(cli client.Client, dispatch func(context.Context, *runnerv1.Task) error, filter *client.Filter) *Poller {
 	return &Poller{
@@ -53,7 +56,7 @@ func (p *Poller) Register(ctx context.Context, cfg config.Runner) error {
 		Name:         cfg.Name,
 		Token:        cfg.Token,
 		Url:          cfg.URL,
-		AgentLabels:  []string{p.Filter.OS, p.Filter.Arch},
+		AgentLabels:  append(defaultLabels, []string{p.Filter.OS, p.Filter.Arch}...),
 		CustomLabels: p.Filter.Labels,
 	}))
 	if err != nil {
