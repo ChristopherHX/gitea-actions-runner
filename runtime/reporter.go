@@ -170,15 +170,12 @@ func (r *Reporter) Close(lastWords string) error {
 	}
 	r.stateM.Unlock()
 
-	if err := retry.Do(func() error {
+	return retry.Do(func() error {
 		if err := r.ReportLog(true); err != nil {
 			return err
 		}
 		return r.ReportState()
-	}, retry.Context(r.ctx)); err != nil {
-		return err
-	}
-	return nil
+	}, retry.Context(r.ctx))
 }
 
 func (r *Reporter) ReportLog(noMore bool) error {

@@ -16,8 +16,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const errorRetryCounterLimit = 3
-const errorRetryTimeSleepSecs = 30
+const (
+	errorRetryCounterLimit  = 3
+	errorRetryTimeSleepSecs = 30
+)
 
 var (
 	ErrDataLock   = errors.New("Data Lock Error")
