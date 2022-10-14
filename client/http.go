@@ -30,6 +30,7 @@ func New(endpoint, secret string, opts ...Option) *HTTPClient {
 			return next(ctx, req)
 		}
 	})
+
 	cfg.opts = append(cfg.opts, connect.WithInterceptors(interceptor))
 
 	if cfg.httpClient == nil {

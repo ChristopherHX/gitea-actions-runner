@@ -8,7 +8,7 @@ create a new file as name `.env`
 
 ```sh
 GITEA_RUNNER_NAME=foobar
-GITEA_RUNNER_URL=localhost:3001/foo/bar
+GITEA_RUNNER_URL=http://localhost:3000/foo/bar
 GITEA_RUNNER_TOKEN=1234567890abcde
 GITEA_RUNNER_LABELS=foo,bar
 ```

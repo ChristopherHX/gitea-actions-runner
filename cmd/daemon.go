@@ -9,8 +9,9 @@ import (
 	"gitea.com/gitea/act_runner/engine"
 	"gitea.com/gitea/act_runner/poller"
 	"gitea.com/gitea/act_runner/runtime"
-
 	pingv1 "gitea.com/gitea/proto-go/ping/v1"
+	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
+
 	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
@@ -98,7 +99,30 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 				return err
 			}
 
+			// update runner status to idle
+			log.Infoln("update runner status to idle")
+			if _, err := cli.UpdateRunner(
+				context.Background(),
+				connect.NewRequest(&runnerv1.UpdateRunnerRequest{
+					Status: runnerv1.RunnerStatus_RUNNER_STATUS_OFFLINE,
+				}),
+			); err != nil {
+				return err
+			}
+
 			return poller.Poll(ctx, cfg.Runner.Capacity)
+		})
+
+		g.Go(func() error {
+			<-ctx.Done()
+			log.Infoln("update runner status to offline")
+			_, err := cli.UpdateRunner(
+				context.Background(),
+				connect.NewRequest(&runnerv1.UpdateRunnerRequest{
+					Status: runnerv1.RunnerStatus_RUNNER_STATUS_OFFLINE,
+				}),
+			)
+			return err
 		})
 
 		err = g.Wait()

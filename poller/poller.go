@@ -126,10 +126,7 @@ func (p *Poller) poll(ctx context.Context, thread int) error {
 
 	// request a new build stage for execution from the central
 	// build server.
-	resp, err := p.Client.FetchTask(ctx, connect.NewRequest(&runnerv1.FetchTaskRequest{
-		Os:   p.Filter.OS,
-		Arch: p.Filter.Arch,
-	}))
+	resp, err := p.Client.FetchTask(ctx, connect.NewRequest(&runnerv1.FetchTaskRequest{}))
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		l.WithError(err).Trace("poller: no stage returned")
 		p.errorRetryCounter++
