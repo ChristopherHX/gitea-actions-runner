@@ -123,12 +123,12 @@ func (p *Poller) poll(ctx context.Context, thread int) error {
 	l := log.WithField("thread", thread)
 	l.Info("poller: request stage from remote server")
 
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	// request a new build stage for execution from the central
 	// build server.
-	resp, err := p.Client.FetchTask(ctx, connect.NewRequest(&runnerv1.FetchTaskRequest{}))
+	resp, err := p.Client.FetchTask(reqCtx, connect.NewRequest(&runnerv1.FetchTaskRequest{}))
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		l.WithError(err).Trace("poller: no stage returned")
 		p.errorRetryCounter++
@@ -155,5 +155,8 @@ func (p *Poller) poll(ctx context.Context, thread int) error {
 
 	p.errorRetryCounter = 0
 
-	return p.Dispatch(ctx, resp.Msg.Task)
+	runCtx, cancel := context.WithTimeout(ctx, time.Hour)
+	defer cancel()
+
+	return p.Dispatch(runCtx, resp.Msg.Task)
 }
