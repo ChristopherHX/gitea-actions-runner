@@ -1,10 +1,14 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 
+	"gitea.com/gitea/act_runner/core"
+	"github.com/appleboy/com/file"
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 )
@@ -52,7 +56,19 @@ func FromEnviron() (Config, error) {
 		return cfg, err
 	}
 
-	cfg.Client.Secret = cfg.Runner.Token
+	// check runner config exist
+	if file.IsFile(cfg.Runner.File) {
+		jsonFile, _ := os.Open(cfg.Runner.File)
+		defer jsonFile.Close()
+		byteValue, _ := io.ReadAll(jsonFile)
+		var runner core.Runner
+		if err := json.Unmarshal(byteValue, &runner); err != nil {
+			return cfg, err
+		}
+		if runner.UUID != "" {
+			cfg.Client.Secret = runner.UUID
+		}
+	}
 
 	// runner config
 	if cfg.Runner.Environ == nil {

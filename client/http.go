@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"gitea.com/gitea/act_runner/core"
 	"gitea.com/gitea/proto-go/ping/v1/pingv1connect"
 	"gitea.com/gitea/proto-go/runner/v1/runnerv1connect"
 
@@ -26,7 +27,7 @@ func New(endpoint, secret string, opts ...Option) *HTTPClient {
 
 	interceptor := connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			req.Header().Set("X-Runner-Token", secret)
+			req.Header().Set(core.UUIDHeader, secret)
 			return next(ctx, req)
 		}
 	})
