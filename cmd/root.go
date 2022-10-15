@@ -52,12 +52,21 @@ func Execute(ctx context.Context) {
 	// ./act_runner daemon
 	daemonCmd := &cobra.Command{
 		Aliases: []string{"daemon"},
-		Use:     "daemon [event name to run]\nIf no event name passed, will default to \"on: push\"",
-		Short:   "Run GitHub actions locally by specifying the event name (e.g. `push`) or an action name directly.",
+		Use:     "execute runner daemon",
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    runDaemon(ctx, task),
 	}
-	rootCmd.AddCommand(daemonCmd)
+
+	// ./act_runner daemon
+	registerCmd := &cobra.Command{
+		Aliases: []string{"register"},
+		Use:     "register new runner",
+		Args:    cobra.MaximumNArgs(1),
+		RunE:    runRegister(ctx, task),
+	}
+
+	// add all command
+	rootCmd.AddCommand(daemonCmd, registerCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

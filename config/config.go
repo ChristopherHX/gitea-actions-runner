@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"runtime"
 
@@ -32,19 +31,17 @@ type (
 
 	Runner struct {
 		Name     string            `envconfig:"GITEA_RUNNER_NAME"`
-		URL      string            `envconfig:"GITEA_RUNNER_URL" required:"true"`
 		Token    string            `envconfig:"GITEA_RUNNER_TOKEN" required:"true"`
 		Capacity int               `envconfig:"GITEA_RUNNER_CAPACITY" default:"1"`
+		File     string            `envconfig:"GITEA_RUNNER_FILE" default:".runner"`
 		Environ  map[string]string `envconfig:"GITEA_RUNNER_ENVIRON"`
 		EnvFile  string            `envconfig:"GITEA_RUNNER_ENV_FILE"`
 		Labels   []string          `envconfig:"GITEA_RUNNER_LABELS"`
 	}
 
 	Platform struct {
-		OS      string `envconfig:"GITEA_PLATFORM_OS"`
-		Arch    string `envconfig:"GITEA_PLATFORM_ARCH"`
-		Kernel  string `envconfig:"GITEA_PLATFORM_KERNEL"`
-		Variant string `envconfig:"GITEA_PLATFORM_VARIANT"`
+		OS   string `envconfig:"GITEA_PLATFORM_OS"`
+		Arch string `envconfig:"GITEA_PLATFORM_ARCH"`
 	}
 )
 
@@ -55,14 +52,6 @@ func FromEnviron() (Config, error) {
 		return cfg, err
 	}
 
-	// check runner remote url
-	u, err := url.Parse(cfg.Runner.URL)
-	if err != nil {
-		return cfg, err
-	}
-
-	cfg.Client.Proto = u.Scheme
-	cfg.Client.Host = u.Host
 	cfg.Client.Secret = cfg.Runner.Token
 
 	// runner config
@@ -97,5 +86,5 @@ func FromEnviron() (Config, error) {
 		}
 	}
 
-	return cfg, err
+	return cfg, nil
 }

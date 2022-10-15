@@ -9,6 +9,7 @@ import (
 
 	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/config"
+	"gitea.com/gitea/act_runner/core"
 	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 
 	"github.com/appleboy/com/file"
@@ -44,16 +45,9 @@ type Poller struct {
 	errorRetryCounter int
 }
 
-type runner struct {
-	id    int64
-	uuid  string
-	name  string
-	token string
-}
-
 func (p *Poller) Register(ctx context.Context, cfg config.Runner) error {
 	// check .runner config exist
-	if file.IsFile(".runner") {
+	if file.IsFile(cfg.File) {
 		return nil
 	}
 
@@ -61,7 +55,6 @@ func (p *Poller) Register(ctx context.Context, cfg config.Runner) error {
 	resp, err := p.Client.Register(ctx, connect.NewRequest(&runnerv1.RegisterRequest{
 		Name:         cfg.Name,
 		Token:        cfg.Token,
-		Url:          cfg.URL,
 		AgentLabels:  append(defaultLabels, []string{p.Filter.OS, p.Filter.Arch}...),
 		CustomLabels: p.Filter.Labels,
 	}))
@@ -70,21 +63,21 @@ func (p *Poller) Register(ctx context.Context, cfg config.Runner) error {
 		return err
 	}
 
-	data := &runner{
-		id:    resp.Msg.Runner.Id,
-		uuid:  resp.Msg.Runner.Uuid,
-		name:  resp.Msg.Runner.Name,
-		token: resp.Msg.Runner.Token,
+	data := &core.Runner{
+		ID:    resp.Msg.Runner.Id,
+		UUID:  resp.Msg.Runner.Uuid,
+		Name:  resp.Msg.Runner.Name,
+		Token: resp.Msg.Runner.Token,
 	}
 
-	file, err := json.MarshalIndent(data, "", " ")
+	file, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		log.WithError(err).Error("poller: cannot marshal the json input")
 		return err
 	}
 
 	// store runner config in .runner file
-	return os.WriteFile(".runner", file, 0o644)
+	return os.WriteFile(cfg.File, file, 0o644)
 }
 
 func (p *Poller) Poll(ctx context.Context, n int) error {
