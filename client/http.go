@@ -1,22 +1,19 @@
 package client
 
 import (
-	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
 	"time"
 
-	"gitea.com/gitea/act_runner/core"
 	"gitea.com/gitea/proto-go/ping/v1/pingv1connect"
 	"gitea.com/gitea/proto-go/runner/v1/runnerv1connect"
 
-	"github.com/bufbuild/connect-go"
 	"golang.org/x/net/http2"
 )
 
 // New returns a new runner client.
-func New(endpoint, secret string, opts ...Option) *HTTPClient {
+func New(endpoint string, opts ...Option) *HTTPClient {
 	cfg := &config{}
 
 	// Loop through each option
@@ -24,15 +21,6 @@ func New(endpoint, secret string, opts ...Option) *HTTPClient {
 		// Call the option giving the instantiated
 		opt.apply(cfg)
 	}
-
-	interceptor := connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
-		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			req.Header().Set(core.UUIDHeader, secret)
-			return next(ctx, req)
-		}
-	})
-
-	cfg.opts = append(cfg.opts, connect.WithInterceptors(interceptor))
 
 	if cfg.httpClient == nil {
 		cfg.httpClient = &http.Client{

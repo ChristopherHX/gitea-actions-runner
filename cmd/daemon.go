@@ -8,6 +8,7 @@ import (
 	"gitea.com/gitea/act_runner/config"
 	"gitea.com/gitea/act_runner/engine"
 	"gitea.com/gitea/act_runner/poller"
+	"gitea.com/gitea/act_runner/register"
 	"gitea.com/gitea/act_runner/runtime"
 	pingv1 "gitea.com/gitea/proto-go/ping/v1"
 	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
@@ -32,15 +33,9 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 
 		initLogging(cfg)
 
-		// try to connect to docker daemon
-		// if failed, exit with error
-		if err := engine.Start(ctx); err != nil {
-			log.WithError(err).Fatalln("failed to connect docker daemon engine")
-		}
-
+		// initial http client
 		cli := client.New(
 			cfg.Client.Address,
-			cfg.Client.Secret,
 			client.WithSkipVerify(cfg.Client.SkipVerify),
 			client.WithGRPC(cfg.Client.GRPC),
 			client.WithGRPCWeb(cfg.Client.GRPCWeb),
@@ -69,7 +64,41 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 			}
 		}
 
+		// register new runner
+		if cfg.Runner.UUID == "" {
+			register := register.New(
+				cli,
+				&client.Filter{
+					OS:     cfg.Platform.OS,
+					Arch:   cfg.Platform.Arch,
+					Labels: cfg.Runner.Labels,
+				},
+			)
+
+			data, err := register.Register(ctx, cfg.Runner)
+			if err != nil {
+				return err
+			}
+			if data.UUID != "" {
+				cfg.Runner.UUID = data.UUID
+			}
+		}
+
+		// try to connect to docker daemon
+		// if failed, exit with error
+		if err := engine.Start(ctx); err != nil {
+			log.WithError(err).Fatalln("failed to connect docker daemon engine")
+		}
+
 		var g errgroup.Group
+
+		cli = client.New(
+			cfg.Client.Address,
+			client.WithSkipVerify(cfg.Client.SkipVerify),
+			client.WithGRPC(cfg.Client.GRPC),
+			client.WithGRPCWeb(cfg.Client.GRPCWeb),
+			client.WithUUIDHeader(cfg.Runner.UUID),
+		)
 
 		runner := &runtime.Runner{
 			Client:  cli,
@@ -80,11 +109,6 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 		poller := poller.New(
 			cli,
 			runner.Run,
-			&client.Filter{
-				OS:     cfg.Platform.OS,
-				Arch:   cfg.Platform.Arch,
-				Labels: cfg.Runner.Labels,
-			},
 		)
 
 		g.Go(func() error {

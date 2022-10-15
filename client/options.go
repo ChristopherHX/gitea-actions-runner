@@ -1,7 +1,10 @@
 package client
 
 import (
+	"context"
 	"net/http"
+
+	"gitea.com/gitea/act_runner/core"
 
 	"github.com/bufbuild/connect-go"
 )
@@ -54,5 +57,23 @@ func WithGRPCWeb(c bool) Option {
 			return
 		}
 		cfg.opts = append(cfg.opts, connect.WithGRPCWeb())
+	})
+}
+
+// WithUUIDHeader add runner uuid in header
+func WithUUIDHeader(uuid string) Option {
+	return OptionFunc(func(cfg *config) {
+		if uuid == "" {
+			return
+		}
+		cfg.opts = append(
+			cfg.opts,
+			connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
+				return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+					req.Header().Set(core.UUIDHeader, uuid)
+					return next(ctx, req)
+				}
+			})),
+		)
 	})
 }

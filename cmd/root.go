@@ -56,17 +56,8 @@ func Execute(ctx context.Context) {
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    runDaemon(ctx, task),
 	}
-
-	// ./act_runner daemon
-	registerCmd := &cobra.Command{
-		Aliases: []string{"register"},
-		Use:     "register new runner",
-		Args:    cobra.MaximumNArgs(1),
-		RunE:    runRegister(ctx, task),
-	}
-
 	// add all command
-	rootCmd.AddCommand(daemonCmd, registerCmd)
+	rootCmd.AddCommand(daemonCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

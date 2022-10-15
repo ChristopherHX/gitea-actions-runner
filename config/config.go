@@ -27,13 +27,13 @@ type (
 		Address    string `ignored:"true"`
 		Proto      string `envconfig:"GITEA_RPC_PROTO"  default:"http"`
 		Host       string `envconfig:"GITEA_RPC_HOST"`
-		Secret     string `envconfig:"GITEA_RPC_SECRET"`
 		SkipVerify bool   `envconfig:"GITEA_RPC_SKIP_VERIFY"`
 		GRPC       bool   `envconfig:"GITEA_RPC_GRPC" default:"true"`
 		GRPCWeb    bool   `envconfig:"GITEA_RPC_GRPC_WEB"`
 	}
 
 	Runner struct {
+		UUID     string            `ignored:"true"`
 		Name     string            `envconfig:"GITEA_RUNNER_NAME"`
 		Token    string            `envconfig:"GITEA_RUNNER_TOKEN" required:"true"`
 		Capacity int               `envconfig:"GITEA_RUNNER_CAPACITY" default:"1"`
@@ -66,7 +66,7 @@ func FromEnviron() (Config, error) {
 			return cfg, err
 		}
 		if runner.UUID != "" {
-			cfg.Client.Secret = runner.UUID
+			cfg.Runner.UUID = runner.UUID
 		}
 	}
 
