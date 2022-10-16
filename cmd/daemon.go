@@ -123,7 +123,7 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 			if _, err := cli.UpdateRunner(
 				context.Background(),
 				connect.NewRequest(&runnerv1.UpdateRunnerRequest{
-					Status: runnerv1.RunnerStatus_RUNNER_STATUS_OFFLINE,
+					Status: runnerv1.RunnerStatus_RUNNER_STATUS_IDLE,
 				}),
 			); err != nil {
 				return err
