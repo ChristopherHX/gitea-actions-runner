@@ -33,7 +33,7 @@ func initLogging(cfg config.Config) {
 }
 
 func Execute(ctx context.Context) {
-	task := runtime.NewTask(0, nil)
+	task := runtime.NewTask("gitea", 0, nil)
 
 	// ./act_runner
 	rootCmd := &cobra.Command{
@@ -54,7 +54,7 @@ func Execute(ctx context.Context) {
 		Aliases: []string{"daemon"},
 		Use:     "execute runner daemon",
 		Args:    cobra.MaximumNArgs(1),
-		RunE:    runDaemon(ctx, task),
+		RunE:    runDaemon(ctx, task.Input.EnvFile),
 	}
 	// add all command
 	rootCmd.AddCommand(daemonCmd)

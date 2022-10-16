@@ -46,6 +46,7 @@ func (p *Register) Register(ctx context.Context, cfg config.Runner) (*core.Runne
 		UUID:  resp.Msg.Runner.Uuid,
 		Name:  resp.Msg.Runner.Name,
 		Token: resp.Msg.Runner.Token,
+		// ForgeInstance: resp.Msg.Runner.ForgeInstance, TODO: add me
 	}
 
 	file, err := json.MarshalIndent(data, "", "  ")

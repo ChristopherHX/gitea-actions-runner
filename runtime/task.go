@@ -86,11 +86,11 @@ type Task struct {
 }
 
 // NewTask creates a new task
-func NewTask(buildID int64, client client.Client) *Task {
+func NewTask(forgeInstance string, buildID int64, client client.Client) *Task {
 	task := &Task{
 		Input: &TaskInput{
 			reuseContainers: true,
-			ForgeInstance:   "gitea",
+			ForgeInstance:   forgeInstance,
 		},
 		BuildID: buildID,
 

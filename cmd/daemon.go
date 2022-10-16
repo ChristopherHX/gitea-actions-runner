@@ -20,11 +20,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command, args []string) error {
+func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		log.Infoln("Starting runner daemon")
 
-		_ = godotenv.Load(task.Input.EnvFile)
+		_ = godotenv.Load(envFile)
 		cfg, err := config.FromEnviron()
 		if err != nil {
 			log.WithError(err).
@@ -101,9 +101,10 @@ func runDaemon(ctx context.Context, task *runtime.Task) func(cmd *cobra.Command,
 		)
 
 		runner := &runtime.Runner{
-			Client:  cli,
-			Machine: cfg.Runner.Name,
-			Environ: cfg.Runner.Environ,
+			Client:        cli,
+			Machine:       cfg.Runner.Name,
+			ForgeInstance: cfg.ForgeInstance,
+			Environ:       cfg.Runner.Environ,
 		}
 
 		poller := poller.New(

@@ -12,9 +12,10 @@ import (
 
 // Runner runs the pipeline.
 type Runner struct {
-	Machine string
-	Environ map[string]string
-	Client  client.Client
+	Machine       string
+	ForgeInstance string
+	Environ       map[string]string
+	Client        client.Client
 }
 
 // Run runs the pipeline stage.
@@ -48,5 +49,5 @@ func (s *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 		l.Info("update runner status to idle")
 	}()
 
-	return NewTask(task.Id, s.Client).Run(ctx, task)
+	return NewTask(s.ForgeInstance, task.Id, s.Client).Run(ctx, task)
 }

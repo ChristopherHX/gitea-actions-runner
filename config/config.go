@@ -16,11 +16,12 @@ import (
 type (
 	// Config provides the system configuration.
 	Config struct {
-		Debug    bool `envconfig:"GITEA_DEBUG"`
-		Trace    bool `envconfig:"GITEA_TRACE"`
-		Client   Client
-		Runner   Runner
-		Platform Platform
+		Debug         bool `envconfig:"GITEA_DEBUG"`
+		Trace         bool `envconfig:"GITEA_TRACE"`
+		Client        Client
+		Runner        Runner
+		Platform      Platform
+		ForgeInstance string
 	}
 
 	Client struct {
@@ -68,6 +69,7 @@ func FromEnviron() (Config, error) {
 		if runner.UUID != "" {
 			cfg.Runner.UUID = runner.UUID
 		}
+		cfg.ForgeInstance = runner.ForgeInstance
 	}
 
 	// runner config
