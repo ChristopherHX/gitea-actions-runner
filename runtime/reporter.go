@@ -12,6 +12,8 @@ import (
 
 	"github.com/avast/retry-go/v4"
 	"github.com/bufbuild/connect-go"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -59,7 +61,9 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 
 	timestamp := entry.Time
 	if r.state.StartedAt == nil {
-		r.state.StartedAt = timestamppb.New(timestamp)
+		r.updateState(func() {
+			r.state.StartedAt = timestamppb.New(timestamp)
+		})
 	}
 
 	var step *runnerv1.StepState
@@ -71,8 +75,8 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 
 	if step == nil {
 		if v, ok := entry.Data["jobResult"]; ok {
-			if v, ok := v.(string); ok {
-				if jobResult := r.parseResult(v); jobResult != runnerv1.Result_RESULT_UNSPECIFIED {
+			if jobResult, ok := r.parseResult(v); ok {
+				r.updateState(func() {
 					r.state.Result = jobResult
 					r.state.StoppedAt = timestamppb.New(timestamp)
 					for _, s := range r.state.Steps {
@@ -80,7 +84,7 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 							s.Result = runnerv1.Result_RESULT_CANCELLED
 						}
 					}
-				}
+				})
 			}
 		}
 		if !r.duringSteps() {
@@ -90,28 +94,33 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 	}
 
 	if step.StartedAt == nil {
-		step.StartedAt = timestamppb.New(timestamp)
+		r.updateState(func() {
+			step.StartedAt = timestamppb.New(timestamp)
+		})
 	}
 
 	if v, ok := entry.Data["raw_output"]; ok {
 		if rawOutput, ok := v.(bool); ok && rawOutput {
-			if step.LogLength == 0 {
-				step.LogIndex = int64(r.logOffset + len(r.logRows))
-			}
-			step.LogLength++
+			r.updateState(func() {
+				if step.LogLength == 0 {
+					step.LogIndex = int64(r.logOffset + len(r.logRows))
+				}
+				step.LogLength++
+			})
 			r.logRows = append(r.logRows, r.parseLogRow(entry))
 			return nil
 		}
 	}
 
-	log.Info(entry.Data)
-
 	if v, ok := entry.Data["stepResult"]; ok {
-		if v, ok := v.(string); ok {
-			if stepResult := r.parseResult(v); stepResult != runnerv1.Result_RESULT_UNSPECIFIED {
+		if stepResult, ok := r.parseResult(v); ok {
+			r.updateState(func() {
+				if step.LogLength == 0 {
+					step.LogIndex = int64(r.logOffset + len(r.logRows))
+				}
 				step.Result = stepResult
 				step.StoppedAt = timestamppb.New(timestamp)
-			}
+			})
 		}
 	}
 
@@ -238,18 +247,25 @@ func (r *Reporter) duringSteps() bool {
 	return true
 }
 
-func (r *Reporter) parseResult(s string) runnerv1.Result {
-	switch s {
-	case "success":
-		return runnerv1.Result_RESULT_SUCCESS
-	case "failure":
-		return runnerv1.Result_RESULT_FAILURE
-	case "skipped":
-		return runnerv1.Result_RESULT_SKIPPED
-	case "cancelled":
-		return runnerv1.Result_RESULT_CANCELLED
+var (
+	stringToResult = map[string]runnerv1.Result{
+		"success":   runnerv1.Result_RESULT_SUCCESS,
+		"failure":   runnerv1.Result_RESULT_FAILURE,
+		"skipped":   runnerv1.Result_RESULT_SKIPPED,
+		"cancelled": runnerv1.Result_RESULT_CANCELLED,
 	}
-	return runnerv1.Result_RESULT_UNSPECIFIED
+)
+
+func (r *Reporter) parseResult(result interface{}) (runnerv1.Result, bool) {
+	str := ""
+	if v, ok := result.(string); ok { // for jobResult
+		str = v
+	} else if v, ok := result.(fmt.Stringer); ok { // for stepResult
+		str = v.String()
+	}
+
+	ret, ok := stringToResult[str]
+	return ret, ok
 }
 
 func (r *Reporter) parseLogRow(entry *log.Entry) *runnerv1.LogRow {
@@ -257,4 +273,20 @@ func (r *Reporter) parseLogRow(entry *log.Entry) *runnerv1.LogRow {
 		Time:    timestamppb.New(entry.Time),
 		Content: strings.TrimSuffix(entry.Message, "\r\n"),
 	}
+}
+
+func (r *Reporter) updateState(update func()) {
+	if log.GetLevel() < log.TraceLevel {
+		update()
+		return
+	}
+
+	before := proto.Clone(r.state)
+	update()
+	diff := cmp.Diff(before, r.state, cmpopts.IgnoreUnexported(
+		runnerv1.TaskState{},
+		runnerv1.StepState{},
+		timestamppb.Timestamp{},
+	))
+	log.Tracef("update state %d: %s", r.state.Id, diff)
 }
