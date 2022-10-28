@@ -1,6 +1,9 @@
 package core
 
-const UUIDHeader = "x-runner-uuid"
+const (
+	UUIDHeader  = "x-runner-uuid"
+	TokenHeader = "x-runner-token"
+)
 
 // Runner struct
 type Runner struct {

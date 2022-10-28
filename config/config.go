@@ -69,6 +69,9 @@ func FromEnviron() (Config, error) {
 		if runner.UUID != "" {
 			cfg.Runner.UUID = runner.UUID
 		}
+		if runner.Token != "" {
+			cfg.Runner.Token = runner.Token
+		}
 		cfg.ForgeInstance = runner.ForgeInstance
 	}
 

@@ -77,3 +77,21 @@ func WithUUIDHeader(uuid string) Option {
 		)
 	})
 }
+
+// WithTokenHeader add runner token in header
+func WithTokenHeader(token string) Option {
+	return OptionFunc(func(cfg *config) {
+		if token == "" {
+			return
+		}
+		cfg.opts = append(
+			cfg.opts,
+			connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
+				return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+					req.Header().Set(core.TokenHeader, token)
+					return next(ctx, req)
+				}
+			})),
+		)
+	})
+}

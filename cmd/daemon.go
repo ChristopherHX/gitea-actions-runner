@@ -82,6 +82,9 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			if data.UUID != "" {
 				cfg.Runner.UUID = data.UUID
 			}
+			if data.Token != "" {
+				cfg.Runner.Token = data.Token
+			}
 		}
 
 		// try to connect to docker daemon
@@ -98,6 +101,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			client.WithGRPC(cfg.Client.GRPC),
 			client.WithGRPCWeb(cfg.Client.GRPCWeb),
 			client.WithUUIDHeader(cfg.Runner.UUID),
+			client.WithTokenHeader(cfg.Runner.Token),
 		)
 
 		runner := &runtime.Runner{
