@@ -18,7 +18,9 @@ import (
 )
 
 type Reporter struct {
-	ctx     context.Context
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	closed  bool
 	client  client.Client
 	clientM sync.Mutex
@@ -29,9 +31,10 @@ type Reporter struct {
 	stateM    sync.RWMutex
 }
 
-func NewReporter(ctx context.Context, client client.Client, taskID int64) *Reporter {
+func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.Client, taskID int64) *Reporter {
 	return &Reporter{
 		ctx:    ctx,
+		cancel: cancel,
 		client: client,
 		state: &runnerv1.TaskState{
 			Id: taskID,
@@ -218,9 +221,14 @@ func (r *Reporter) ReportState() error {
 	state := proto.Clone(r.state).(*runnerv1.TaskState)
 	r.stateM.RUnlock()
 
-	_, err := r.client.UpdateTask(r.ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
+	resp, err := r.client.UpdateTask(r.ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
 		State: state,
 	}))
+
+	if resp.Msg.State.Result == runnerv1.Result_RESULT_CANCELLED {
+		r.cancel()
+	}
+
 	return err
 }
 
@@ -235,14 +243,12 @@ func (r *Reporter) duringSteps() bool {
 	return true
 }
 
-var (
-	stringToResult = map[string]runnerv1.Result{
-		"success":   runnerv1.Result_RESULT_SUCCESS,
-		"failure":   runnerv1.Result_RESULT_FAILURE,
-		"skipped":   runnerv1.Result_RESULT_SKIPPED,
-		"cancelled": runnerv1.Result_RESULT_CANCELLED,
-	}
-)
+var stringToResult = map[string]runnerv1.Result{
+	"success":   runnerv1.Result_RESULT_SUCCESS,
+	"failure":   runnerv1.Result_RESULT_FAILURE,
+	"skipped":   runnerv1.Result_RESULT_SKIPPED,
+	"cancelled": runnerv1.Result_RESULT_CANCELLED,
+}
 
 func (r *Reporter) parseResult(result interface{}) (runnerv1.Result, bool) {
 	str := ""

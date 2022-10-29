@@ -3,7 +3,7 @@ module gitea.com/gitea/act_runner
 go 1.18
 
 require (
-	gitea.com/gitea/proto-go v0.0.0-20221014123629-9116865c883b
+	gitea.com/gitea/proto-go v0.0.0-20221028125601-35c4f6b05835
 	github.com/appleboy/com v0.1.6
 	github.com/avast/retry-go/v4 v4.1.0
 	github.com/bufbuild/connect-go v0.5.0

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"gitea.com/gitea/act_runner/client"
 	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
@@ -18,9 +19,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var globalTaskMap sync.Map
+
 type TaskInput struct {
 	repoDirectory string
-	actor         string
+	// actor         string
 	// workdir string
 	// workflowsPath         string
 	// autodetectEvent       bool
@@ -57,30 +60,10 @@ type TaskInput struct {
 	EnvFile       string
 }
 
-type TaskState int
-
-const (
-	// TaskStateUnknown is the default state
-	TaskStateUnknown TaskState = iota
-	// TaskStatePending is the pending state
-	// pending means task is received, parsing actions and preparing to run
-	TaskStatePending
-	// TaskStateRunning is the state when the task is running
-	// running means task is running
-	TaskStateRunning
-	// TaskStateSuccess is the state when the task is successful
-	// success means task is successful without any error
-	TaskStateSuccess
-	// TaskStateFailure is the state when the task is failed
-	// failure means task is failed with error
-	TaskStateFailure
-)
-
 type Task struct {
 	BuildID int64
 	Input   *TaskInput
 
-	state  TaskState
 	client client.Client
 	log    *log.Entry
 }
@@ -94,7 +77,6 @@ func NewTask(forgeInstance string, buildID int64, client client.Client) *Task {
 		},
 		BuildID: buildID,
 
-		state:  TaskStatePending,
 		client: client,
 		log:    log.WithField("buildID", buildID),
 	}
@@ -124,6 +106,8 @@ func demoPlatforms() map[string]string {
 }
 
 func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	_, exist := globalTaskMap.Load(task.Id)
 	if exist {
 		return fmt.Errorf("task %d already exists", task.Id)
@@ -135,11 +119,10 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	defer globalTaskMap.Delete(task.Id)
 
 	lastWords := ""
-	reporter := NewReporter(ctx, t.client, task.Id)
+	reporter := NewReporter(ctx, cancel, t.client, task.Id)
 	defer func() {
 		_ = reporter.Close(lastWords)
 	}()
-	reporter.RunDaemon()
 
 	reporter.Logf("received task %v of job %v", task.Id, task.Context.Fields["job"].GetStringValue())
 
@@ -157,17 +140,16 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	}
 
 	var plan *model.Plan
-	if jobIDs := workflow.GetJobIDs(); len(jobIDs) != 1 {
-		err := fmt.Errorf("multiple jobs fould: %v", jobIDs)
+	jobIDs := workflow.GetJobIDs()
+	if len(jobIDs) != 1 {
+		err := fmt.Errorf("multiple jobs found: %v", jobIDs)
 		lastWords = err.Error()
 		return err
-	} else {
-		jobID := jobIDs[0]
-		plan = model.CombineWorkflowPlanner(workflow).PlanJob(jobID)
-
-		job := workflow.GetJob(jobID)
-		reporter.ResetSteps(len(job.Steps))
 	}
+	jobID := jobIDs[0]
+	plan = model.CombineWorkflowPlanner(workflow).PlanJob(jobID)
+	job := workflow.GetJob(jobID)
+	reporter.ResetSteps(len(job.Steps))
 
 	log.Infof("plan: %+v", plan.Stages[0].Runs)
 
@@ -234,11 +216,11 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		return err
 	}
 
-	cancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
+	artifactCancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
 	t.log.Debugf("artifacts server started at %s:%s", input.artifactServerPath, input.artifactServerPort)
 
 	executor := r.NewPlanExecutor(plan).Finally(func(ctx context.Context) error {
-		cancel()
+		artifactCancel()
 		return nil
 	})
 
