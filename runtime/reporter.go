@@ -224,12 +224,15 @@ func (r *Reporter) ReportState() error {
 	resp, err := r.client.UpdateTask(r.ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
 		State: state,
 	}))
+	if err != nil {
+		return err
+	}
 
-	if resp.Msg.State.Result == runnerv1.Result_RESULT_CANCELLED {
+	if resp.Msg.State != nil && resp.Msg.State.Result == runnerv1.Result_RESULT_CANCELLED {
 		r.cancel()
 	}
 
-	return err
+	return nil
 }
 
 func (r *Reporter) duringSteps() bool {
