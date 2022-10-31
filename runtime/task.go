@@ -105,6 +105,17 @@ func demoPlatforms() map[string]string {
 	}
 }
 
+func getToken(task *runnerv1.Task) string {
+	token := task.Secrets["GITHUB_TOKEN"]
+	if task.Secrets["GITEA_TOKEN"] != "" {
+		token = task.Secrets["GITEA_TOKEN"]
+	}
+	if task.Context.Fields["token"].GetStringValue() != "" {
+		token = task.Context.Fields["token"].GetStringValue()
+	}
+	return token
+}
+
 func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -159,6 +170,9 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		return err
 	}
 
+	token := getToken(task)
+	log.Infof("task %v token is %v", task.Id, token)
+
 	dataContext := task.Context.Fields
 	preset := &model.GithubContext{
 		Event:           dataContext["event"].GetStructValue().AsMap(),
@@ -173,7 +187,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		RefType:         dataContext["ref_type"].GetStringValue(),
 		HeadRef:         dataContext["head_ref"].GetStringValue(),
 		BaseRef:         dataContext["base_ref"].GetStringValue(),
-		Token:           dataContext["token"].GetStringValue(),
+		Token:           token,
 		RepositoryOwner: dataContext["repository_owner"].GetStringValue(),
 		RetentionDays:   dataContext["retention_days"].GetStringValue(),
 	}
