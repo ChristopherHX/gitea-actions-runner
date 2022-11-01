@@ -134,6 +134,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	defer func() {
 		_ = reporter.Close(lastWords)
 	}()
+	reporter.RunDaemon()
 
 	reporter.Logf("received task %v of job %v", task.Id, task.Context.Fields["job"].GetStringValue())
 
