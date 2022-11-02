@@ -25,19 +25,29 @@ type Reporter struct {
 	client  client.Client
 	clientM sync.Mutex
 
-	logOffset int
-	logRows   []*runnerv1.LogRow
-	state     *runnerv1.TaskState
-	stateM    sync.RWMutex
+	logOffset   int
+	logRows     []*runnerv1.LogRow
+	logReplacer *strings.Replacer
+	state       *runnerv1.TaskState
+	stateM      sync.RWMutex
 }
 
-func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.Client, taskID int64) *Reporter {
+func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.Client, task *runnerv1.Task) *Reporter {
+	var oldnew []string
+	if v := task.Context.Fields["token"].GetStringValue(); v != "" {
+		oldnew = append(oldnew, v, "***")
+	}
+	for _, v := range task.Secrets {
+		oldnew = append(oldnew, v, "***")
+	}
+
 	return &Reporter{
-		ctx:    ctx,
-		cancel: cancel,
-		client: client,
+		ctx:         ctx,
+		cancel:      cancel,
+		client:      client,
+		logReplacer: strings.NewReplacer(oldnew...),
 		state: &runnerv1.TaskState{
-			Id: taskID,
+			Id: task.Id,
 		},
 	}
 }
@@ -266,8 +276,10 @@ func (r *Reporter) parseResult(result interface{}) (runnerv1.Result, bool) {
 }
 
 func (r *Reporter) parseLogRow(entry *log.Entry) *runnerv1.LogRow {
+	content := strings.TrimSuffix(entry.Message, "\r\n")
+	content = r.logReplacer.Replace(content)
 	return &runnerv1.LogRow{
 		Time:    timestamppb.New(entry.Time),
-		Content: strings.TrimSuffix(entry.Message, "\r\n"),
+		Content: content,
 	}
 }

@@ -131,7 +131,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	defer globalTaskMap.Delete(task.Id)
 
 	lastWords := ""
-	reporter := NewReporter(ctx, cancel, t.client, task.Id)
+	reporter := NewReporter(ctx, cancel, t.client, task)
 	defer func() {
 		_ = reporter.Close(lastWords)
 	}()
