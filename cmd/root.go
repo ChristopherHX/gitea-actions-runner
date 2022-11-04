@@ -33,7 +33,7 @@ func initLogging(cfg config.Config) {
 }
 
 func Execute(ctx context.Context) {
-	task := runtime.NewTask("gitea", 0, nil)
+	task := runtime.NewTask("gitea", 0, nil, nil)
 
 	// ./act_runner
 	rootCmd := &cobra.Command{

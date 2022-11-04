@@ -75,9 +75,18 @@ func FromEnviron() (Config, error) {
 		cfg.ForgeInstance = runner.ForgeInstance
 	}
 
+	cfg.Client.Address = fmt.Sprintf(
+		"%s://%s",
+		cfg.Client.Proto,
+		cfg.Client.Host,
+	)
+
 	// runner config
 	if cfg.Runner.Environ == nil {
-		cfg.Runner.Environ = map[string]string{}
+		cfg.Runner.Environ = map[string]string{
+			"GITHUB_API_URL":    cfg.Client.Address + "/api/v1",
+			"GITHUB_SERVER_URL": cfg.Client.Address,
+		}
 	}
 	if cfg.Runner.Name == "" {
 		cfg.Runner.Name, _ = os.Hostname()
@@ -90,12 +99,6 @@ func FromEnviron() (Config, error) {
 	if cfg.Platform.Arch == "" {
 		cfg.Platform.Arch = runtime.GOARCH
 	}
-
-	cfg.Client.Address = fmt.Sprintf(
-		"%s://%s",
-		cfg.Client.Proto,
-		cfg.Client.Host,
-	)
 
 	if file := cfg.Runner.EnvFile; file != "" {
 		envs, err := godotenv.Read(file)

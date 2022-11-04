@@ -31,7 +31,7 @@ type TaskInput struct {
 	reuseContainers bool
 	bindWorkdir     bool
 	// secrets         []string
-	// envs []string
+	envs map[string]string
 	// platforms       []string
 	// dryrun       bool
 	forcePull    bool
@@ -69,11 +69,12 @@ type Task struct {
 }
 
 // NewTask creates a new task
-func NewTask(forgeInstance string, buildID int64, client client.Client) *Task {
+func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEnvs map[string]string) *Task {
 	task := &Task{
 		Input: &TaskInput{
 			reuseContainers: true,
 			ForgeInstance:   forgeInstance,
+			envs:            runnerEnvs,
 		},
 		BuildID: buildID,
 
@@ -172,9 +173,10 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	}
 
 	token := getToken(task)
-	log.Infof("task %v token is %v", task.Id, token)
-
 	dataContext := task.Context.Fields
+
+	log.Infof("task %v token is %v %v", task.Id, token, dataContext["repository"].GetStringValue())
+
 	preset := &model.GithubContext{
 		Event:           dataContext["event"].GetStructValue().AsMap(),
 		RunID:           dataContext["run_id"].GetStringValue(),
@@ -224,6 +226,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		NoSkipCheckout:        input.noSkipCheckout,
 		PresetGitHubContext:   preset,
 		EventJSON:             string(eventJSON),
+		Env:                   t.Input.envs,
 	}
 	r, err := runner.New(config)
 	if err != nil {

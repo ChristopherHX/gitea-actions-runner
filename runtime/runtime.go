@@ -49,5 +49,5 @@ func (s *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 		l.Info("update runner status to idle")
 	}()
 
-	return NewTask(s.ForgeInstance, task.Id, s.Client).Run(ctx, task)
+	return NewTask(s.ForgeInstance, task.Id, s.Client, s.Environ).Run(ctx, task)
 }
