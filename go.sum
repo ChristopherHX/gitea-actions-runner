@@ -23,10 +23,8 @@ cloud.google.com/go/storage v1.0.0/go.mod h1:IhtSnM/ZTZV8YYJWCY8RULGVqBDmpoyjwiy
 cloud.google.com/go/storage v1.5.0/go.mod h1:tpKbwo567HUNpVclU5sGELwQWBDZ8gh0ZeosJ0Rtdos=
 cloud.google.com/go/storage v1.6.0/go.mod h1:N7U0C8pVQ/+NIKOBQyamJIeKQKkZ+mxpohlUTyfDhBk=
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
-gitea.com/gitea/act v0.0.0-20220922135643-52a5bba9e7fa h1:HHqlvfIvqFlny3sgJgAM1BYeLNr1uM4yXtvF7aAoYK8=
-gitea.com/gitea/act v0.0.0-20220922135643-52a5bba9e7fa/go.mod h1:9W/Nz16tjfnWp7O5DUo3EjZBnZFBI/5rlWstX4o7+hU=
-gitea.com/gitea/proto-go v0.0.0-20221014123629-9116865c883b h1:TSz7VRHfnM/5JwGPgIAjSlDIvcr4pTGfuRMtgMxttmg=
-gitea.com/gitea/proto-go v0.0.0-20221014123629-9116865c883b/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
+gitea.com/gitea/act v0.0.0-20221108101106-28099ee68a88 h1:pfeGhadGGQbQuXqIgi/C6NQ+VopNEkHayz49IgANPAg=
+gitea.com/gitea/act v0.0.0-20221108101106-28099ee68a88/go.mod h1:lpzib6X73FHLSaTqTakan1xcsCAVhlZvPSpLns7jkRo=
 gitea.com/gitea/proto-go v0.0.0-20221028125601-35c4f6b05835 h1:27PhT7Nli/pgRo1bDYVZ+hlCKuF9cfFuo+y9muaPVJY=
 gitea.com/gitea/proto-go v0.0.0-20221028125601-35c4f6b05835/go.mod h1:hD8YwSHusjwjEEgubW6XFvnZuNhMZTHz6lwjfltEt/Y=
 github.com/Azure/azure-sdk-for-go v16.2.1+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=

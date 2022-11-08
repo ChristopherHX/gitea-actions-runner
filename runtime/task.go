@@ -72,7 +72,7 @@ type Task struct {
 func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEnvs map[string]string) *Task {
 	task := &Task{
 		Input: &TaskInput{
-			reuseContainers: true,
+			reuseContainers: false,
 			ForgeInstance:   forgeInstance,
 			envs:            runnerEnvs,
 		},
@@ -166,12 +166,6 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 
 	log.Infof("plan: %+v", plan.Stages[0].Runs)
 
-	curDir, err := os.Getwd()
-	if err != nil {
-		lastWords = err.Error()
-		return err
-	}
-
 	token := getToken(task)
 	dataContext := task.Context.Fields
 
@@ -202,13 +196,14 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 
 	input := t.Input
 	config := &runner.Config{
-		Workdir:               curDir, // TODO: temp dir?
+		Workdir:               "/root",
 		BindWorkdir:           input.bindWorkdir,
 		ReuseContainers:       input.reuseContainers,
 		ForcePull:             input.forcePull,
 		ForceRebuild:          input.forceRebuild,
 		LogOutput:             true,
 		JSONLogger:            input.jsonLogger,
+		Env:                   input.envs,
 		Secrets:               task.Secrets,
 		InsecureSecrets:       input.insecureSecrets,
 		Platforms:             demoPlatforms(), // TODO: supported platforms
@@ -226,7 +221,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		NoSkipCheckout:        input.noSkipCheckout,
 		PresetGitHubContext:   preset,
 		EventJSON:             string(eventJSON),
-		Env:                   t.Input.envs,
+		ContainerNamePrefix:   fmt.Sprintf("gitea-task-%d", task.Id),
 	}
 	r, err := runner.New(config)
 	if err != nil {
