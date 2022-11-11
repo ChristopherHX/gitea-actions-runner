@@ -101,9 +101,9 @@ func getWorkflowsPath(dir string) (string, error) {
 
 func demoPlatforms() map[string]string {
 	return map[string]string{
-		"ubuntu-latest": "node:16-buster-slim",
-		"ubuntu-20.04":  "node:16-buster-slim",
-		"ubuntu-18.04":  "node:16-buster-slim",
+		"ubuntu-latest": "node:16-buster",
+		"ubuntu-20.04":  "node:16-buster",
+		"ubuntu-18.04":  "node:16-buster",
 	}
 }
 
