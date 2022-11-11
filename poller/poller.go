@@ -24,6 +24,7 @@ func New(cli client.Client, dispatch func(context.Context, *runnerv1.Task) error
 		Client:       cli,
 		Dispatch:     dispatch,
 		routineGroup: newRoutineGroup(),
+		metric:       &metric{},
 	}
 }
 
@@ -33,6 +34,7 @@ type Poller struct {
 	Dispatch func(context.Context, *runnerv1.Task) error
 
 	routineGroup      *routineGroup
+	metric            *metric
 	errorRetryCounter int
 }
 
@@ -110,6 +112,39 @@ func (p *Poller) poll(ctx context.Context, thread int) error {
 
 	runCtx, cancel := context.WithTimeout(ctx, time.Hour)
 	defer cancel()
+
+	// update runner status
+	// running: idle -> active
+	// stopped: active -> idle
+	if val := p.metric.IncBusyWorker(); val == 1 {
+		if _, err := p.Client.UpdateRunner(
+			ctx,
+			connect.NewRequest(&runnerv1.UpdateRunnerRequest{
+				Status: runnerv1.RunnerStatus_RUNNER_STATUS_ACTIVE,
+			}),
+		); err != nil {
+			return err
+		}
+		l.Info("update runner status to active")
+	}
+
+	defer func() {
+		if val := p.metric.DecBusyWorker(); val != 0 {
+			return
+		}
+
+		defer func() {
+			if _, err := p.Client.UpdateRunner(
+				ctx,
+				connect.NewRequest(&runnerv1.UpdateRunnerRequest{
+					Status: runnerv1.RunnerStatus_RUNNER_STATUS_IDLE,
+				}),
+			); err != nil {
+				log.Errorln("update status error:", err.Error())
+			}
+			l.Info("update runner status to idle")
+		}()
+	}()
 
 	return p.Dispatch(runCtx, resp.Msg.Task)
 }
