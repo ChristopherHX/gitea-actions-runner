@@ -75,6 +75,7 @@ func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEn
 			reuseContainers: false,
 			ForgeInstance:   forgeInstance,
 			envs:            runnerEnvs,
+			noSkipCheckout:  true,
 		},
 		BuildID: buildID,
 
