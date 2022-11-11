@@ -17,10 +17,7 @@ const (
 	errorRetryTimeSleepSecs = 30
 )
 
-var (
-	ErrDataLock   = errors.New("Data Lock Error")
-	defaultLabels = []string{"self-hosted"}
-)
+var ErrDataLock = errors.New("Data Lock Error")
 
 func New(cli client.Client, dispatch func(context.Context, *runnerv1.Task) error) *Poller {
 	return &Poller{
@@ -37,6 +34,10 @@ type Poller struct {
 
 	routineGroup      *routineGroup
 	errorRetryCounter int
+}
+
+func (p *Poller) Wait() {
+	p.routineGroup.Wait()
 }
 
 func (p *Poller) Poll(ctx context.Context, n int) error {

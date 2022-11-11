@@ -138,6 +138,9 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 		})
 
 		g.Go(func() error {
+			// wait all workflows done.
+			poller.Wait()
+			// received the shutdown signal
 			<-ctx.Done()
 			log.Infoln("update runner status to offline")
 			_, err := cli.UpdateRunner(
