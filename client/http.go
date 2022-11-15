@@ -62,7 +62,12 @@ func New(endpoint string, opts ...Option) *HTTPClient {
 			endpoint,
 			cfg.opts...,
 		),
+		endpoint: endpoint,
 	}
+}
+
+func (c *HTTPClient) Address() string {
+	return c.endpoint
 }
 
 var _ Client = (*HTTPClient)(nil)
@@ -71,4 +76,5 @@ var _ Client = (*HTTPClient)(nil)
 type HTTPClient struct {
 	pingv1connect.PingServiceClient
 	runnerv1connect.RunnerServiceClient
+	endpoint string
 }

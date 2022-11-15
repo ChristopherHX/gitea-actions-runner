@@ -3,15 +3,12 @@ package cmd
 import (
 	"context"
 	"os"
-	"time"
 
 	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/config"
 	"gitea.com/gitea/act_runner/engine"
 	"gitea.com/gitea/act_runner/poller"
-	"gitea.com/gitea/act_runner/register"
 	"gitea.com/gitea/act_runner/runtime"
-	pingv1 "gitea.com/gitea/proto-go/ping/v1"
 	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 
 	"github.com/bufbuild/connect-go"
@@ -35,60 +32,6 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 
 		initLogging(cfg)
 
-		// initial http client
-		cli := client.New(
-			cfg.Client.Address,
-			client.WithSkipVerify(cfg.Client.SkipVerify),
-			client.WithGRPC(cfg.Client.GRPC),
-			client.WithGRPCWeb(cfg.Client.GRPCWeb),
-		)
-
-		for {
-			_, err := cli.Ping(ctx, connect.NewRequest(&pingv1.PingRequest{
-				Data: cfg.Runner.Name,
-			}))
-			select {
-			case <-ctx.Done():
-				return nil
-			default:
-			}
-			if ctx.Err() != nil {
-				break
-			}
-			if err != nil {
-				log.WithError(err).
-					Errorln("cannot ping the remote server")
-				// TODO: if ping failed, retry or exit
-				time.Sleep(time.Second)
-			} else {
-				log.Infoln("successfully pinged the remote server")
-				break
-			}
-		}
-
-		// register new runner
-		if cfg.Runner.UUID == "" {
-			register := register.New(
-				cli,
-				&client.Filter{
-					OS:     cfg.Platform.OS,
-					Arch:   cfg.Platform.Arch,
-					Labels: cfg.Runner.Labels,
-				},
-			)
-
-			data, err := register.Register(ctx, cfg.Runner)
-			if err != nil {
-				return err
-			}
-			if data.UUID != "" {
-				cfg.Runner.UUID = data.UUID
-			}
-			if data.Token != "" {
-				cfg.Runner.Token = data.Token
-			}
-		}
-
 		// try to connect to docker daemon
 		// if failed, exit with error
 		if err := engine.Start(ctx); err != nil {
@@ -97,7 +40,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 
 		var g errgroup.Group
 
-		cli = client.New(
+		cli := client.New(
 			cfg.Client.Address,
 			client.WithSkipVerify(cfg.Client.SkipVerify),
 			client.WithGRPC(cfg.Client.GRPC),

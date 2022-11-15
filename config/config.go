@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"runtime"
@@ -26,8 +25,6 @@ type (
 
 	Client struct {
 		Address    string `ignored:"true"`
-		Proto      string `envconfig:"GITEA_RPC_PROTO"  default:"http"`
-		Host       string `envconfig:"GITEA_RPC_HOST"`
 		SkipVerify bool   `envconfig:"GITEA_RPC_SKIP_VERIFY"`
 		GRPC       bool   `envconfig:"GITEA_RPC_GRPC" default:"true"`
 		GRPCWeb    bool   `envconfig:"GITEA_RPC_GRPC_WEB"`
@@ -36,7 +33,7 @@ type (
 	Runner struct {
 		UUID     string            `ignored:"true"`
 		Name     string            `envconfig:"GITEA_RUNNER_NAME"`
-		Token    string            `envconfig:"GITEA_RUNNER_TOKEN" required:"true"`
+		Token    string            `ignored:"true"`
 		Capacity int               `envconfig:"GITEA_RUNNER_CAPACITY" default:"1"`
 		File     string            `envconfig:"GITEA_RUNNER_FILE" default:".runner"`
 		Environ  map[string]string `envconfig:"GITEA_RUNNER_ENVIRON"`
@@ -72,14 +69,11 @@ func FromEnviron() (Config, error) {
 		if runner.Token != "" {
 			cfg.Runner.Token = runner.Token
 		}
+		if runner.Address != "" {
+			cfg.Client.Address = runner.Address
+		}
 		cfg.ForgeInstance = runner.ForgeInstance
 	}
-
-	cfg.Client.Address = fmt.Sprintf(
-		"%s://%s",
-		cfg.Client.Proto,
-		cfg.Client.Host,
-	)
 
 	// runner config
 	if cfg.Runner.Environ == nil {

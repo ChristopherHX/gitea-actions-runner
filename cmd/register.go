@@ -7,14 +7,22 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"time"
 
+	"gitea.com/gitea/act_runner/client"
+	"gitea.com/gitea/act_runner/config"
+	"gitea.com/gitea/act_runner/register"
+	pingv1 "gitea.com/gitea/proto-go/ping/v1"
+	"github.com/appleboy/com/file"
+	"github.com/bufbuild/connect-go"
+	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 // runRegister registers a runner to the server
-func runRegister(ctx context.Context, regArgs *registerArgs) func(*cobra.Command, []string) error {
+func runRegister(ctx context.Context, regArgs *registerArgs, envFile string) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		log.SetReportCaller(false)
 		isTerm := isatty.IsTerminal(os.Stdout.Fd())
@@ -22,6 +30,7 @@ func runRegister(ctx context.Context, regArgs *registerArgs) func(*cobra.Command
 			DisableColors:    !isTerm,
 			DisableTimestamp: true,
 		})
+		log.SetLevel(log.DebugLevel)
 
 		log.Infof("Registering runner, arch=%s, os=%s, version=%s.",
 			runtime.GOARCH, runtime.GOOS, version)
@@ -33,7 +42,7 @@ func runRegister(ctx context.Context, regArgs *registerArgs) func(*cobra.Command
 		}
 
 		go func() {
-			if err := registerInteractive(); err != nil {
+			if err := registerInteractive(envFile); err != nil {
 				// log.Errorln(err)
 				os.Exit(2)
 				return
@@ -59,12 +68,14 @@ type registerArgs struct {
 type registerStage int8
 
 const (
-	StageUnknown       registerStage = -1
-	StageInputInstance registerStage = iota + 1
+	StageUnknown              registerStage = -1
+	StageOverwriteLocalConfig registerStage = iota + 1
+	StageInputInstance
 	StageInputToken
 	StageInputRunnerName
 	StageInputCustomLabels
 	StageWaitingForRegistration
+	StageExit
 )
 
 type registerInputs struct {
@@ -90,6 +101,11 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 	}
 
 	switch stage {
+	case StageOverwriteLocalConfig:
+		if value == "Y" || value == "y" {
+			return StageInputInstance
+		}
+		return StageExit
 	case StageInputInstance:
 		r.InstanceAddr = value
 		return StageInputToken
@@ -106,15 +122,30 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 	return StageUnknown
 }
 
-func registerInteractive() error {
+func getLocalConfigFile(envFile string) (string, bool) {
+	_ = godotenv.Load(envFile)
+	cfg, _ := config.FromEnviron()
+	return cfg.Runner.File, file.IsFile(cfg.Runner.File)
+}
+
+func registerInteractive(envFile string) error {
+
 	var (
 		reader = bufio.NewReader(os.Stdin)
 		stage  = StageInputInstance
 		inputs = new(registerInputs)
 	)
 
+	// check if overwrite local config
+	_ = godotenv.Load(envFile)
+	cfg, _ := config.FromEnviron()
+	if file.IsFile(cfg.Runner.File) {
+		stage = StageOverwriteLocalConfig
+	}
+
 	for {
 		printStageHelp(stage)
+
 		cmdString, err := reader.ReadString('\n')
 		if err != nil {
 			return err
@@ -123,6 +154,15 @@ func registerInteractive() error {
 
 		if stage == StageWaitingForRegistration {
 			log.Infof("Registering runner, name=%s, instance=%s, labels=%v.", inputs.RunnerName, inputs.InstanceAddr, inputs.CustomLabels)
+			if err := doRegister(&cfg, inputs); err != nil {
+				log.Errorf("Failed to register runner: %v", err)
+			} else {
+				log.Infof("Runner registered successfully.")
+			}
+			return nil
+		}
+
+		if stage == StageExit {
 			return nil
 		}
 
@@ -135,6 +175,8 @@ func registerInteractive() error {
 
 func printStageHelp(stage registerStage) {
 	switch stage {
+	case StageOverwriteLocalConfig:
+		log.Infoln("Runner is already registered, overwrite local config? [Y/n]")
 	case StageInputInstance:
 		log.Infoln("Enter the Gitea instance URL (for example, https://gitea.com/):")
 	case StageInputToken:
@@ -147,4 +189,58 @@ func printStageHelp(stage registerStage) {
 	case StageWaitingForRegistration:
 		log.Infoln("Waiting for registration...")
 	}
+}
+
+func doRegister(cfg *config.Config, inputs *registerInputs) error {
+
+	ctx := context.Background()
+
+	// initial http client
+	cli := client.New(
+		inputs.InstanceAddr,
+		client.WithSkipVerify(cfg.Client.SkipVerify),
+		client.WithGRPC(cfg.Client.GRPC),
+		client.WithGRPCWeb(cfg.Client.GRPCWeb),
+	)
+
+	for {
+		_, err := cli.Ping(ctx, connect.NewRequest(&pingv1.PingRequest{
+			Data: inputs.RunnerName,
+		}))
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		if ctx.Err() != nil {
+			break
+		}
+		if err != nil {
+			log.WithError(err).
+				Errorln("Cannot ping the Gitea instance server")
+			// TODO: if ping failed, retry or exit
+			time.Sleep(time.Second)
+		} else {
+			log.Debugln("Successfully pinged the Gitea instance server")
+			break
+		}
+	}
+
+	register := register.New(
+		cli,
+		&client.Filter{
+			OS:     cfg.Platform.OS,
+			Arch:   cfg.Platform.Arch,
+			Labels: inputs.CustomLabels,
+		},
+	)
+	cfg.Runner.Name = inputs.RunnerName
+	cfg.Runner.Token = inputs.Token
+	_, err := register.Register(ctx, cfg.Runner)
+	if err != nil {
+		log.WithError(err).Errorln("Cannot register the runner")
+		return nil
+	}
+
+	return nil
 }

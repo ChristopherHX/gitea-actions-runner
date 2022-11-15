@@ -15,4 +15,5 @@ type Filter struct {
 type Client interface {
 	pingv1connect.PingServiceClient
 	runnerv1connect.RunnerServiceClient
+	Address() string
 }

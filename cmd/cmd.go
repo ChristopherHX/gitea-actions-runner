@@ -14,8 +14,14 @@ import (
 
 const version = "0.1.5"
 
+type globalArgs struct {
+	EnvFile string
+}
+
 func Execute(ctx context.Context) {
-	task := runtime.NewTask("gitea", 0, nil, nil)
+	// task := runtime.NewTask("gitea", 0, nil, nil)
+
+	var gArgs globalArgs
 
 	// ./act_runner
 	rootCmd := &cobra.Command{
@@ -26,10 +32,10 @@ func Execute(ctx context.Context) {
 		Version:      version,
 		SilenceUsage: true,
 	}
-	rootCmd.Flags().BoolP("run", "r", false, "run workflows")
-	rootCmd.Flags().StringP("job", "j", "", "run job")
-	rootCmd.PersistentFlags().StringVarP(&task.Input.ForgeInstance, "forge-instance", "", "github.com", "Forge instance to use.")
-	rootCmd.PersistentFlags().StringVarP(&task.Input.EnvFile, "env-file", "", ".env", "Read in a file of environment variables.")
+	//rootCmd.Flags().BoolP("run", "r", false, "run workflows")
+	//rootCmd.Flags().StringP("job", "j", "", "run job")
+	//rootCmd.PersistentFlags().StringVarP(&task.Input.ForgeInstance, "forge-instance", "", "github.com", "Forge instance to use.")
+	rootCmd.PersistentFlags().StringVarP(&gArgs.EnvFile, "env-file", "", ".env", "Read in a file of environment variables.")
 
 	// ./act_runner register
 	var regArgs registerArgs
@@ -37,7 +43,7 @@ func Execute(ctx context.Context) {
 		Use:   "register",
 		Short: "Register a runner to the server",
 		Args:  cobra.MaximumNArgs(0),
-		RunE:  runRegister(ctx, &regArgs), // must use a pointer to regArgs
+		RunE:  runRegister(ctx, &regArgs, gArgs.EnvFile), // must use a pointer to regArgs
 	}
 	registerCmd.Flags().BoolVarP(&regArgs.NoInteractive, "no-interactive", "", false, "Disable interactive mode")
 	registerCmd.Flags().StringVarP(&regArgs.InstanceAddr, "instance", "", "", "Gitea instance address")
@@ -49,7 +55,7 @@ func Execute(ctx context.Context) {
 		Use:   "daemon",
 		Short: "Run as a runner daemon",
 		Args:  cobra.MaximumNArgs(1),
-		RunE:  runDaemon(ctx, task.Input.EnvFile),
+		RunE:  runDaemon(ctx, gArgs.EnvFile),
 	}
 	// add all command
 	rootCmd.AddCommand(daemonCmd)
