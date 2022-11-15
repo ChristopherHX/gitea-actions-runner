@@ -131,7 +131,9 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 					Status: runnerv1.RunnerStatus_RUNNER_STATUS_IDLE,
 				}),
 			); err != nil {
-				return err
+				// go on, if return err, the program will be stuck
+				log.WithError(err).
+					Errorln("failed to update runner")
 			}
 
 			return poller.Poll(ctx, cfg.Runner.Capacity)
