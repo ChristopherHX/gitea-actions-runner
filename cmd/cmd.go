@@ -5,32 +5,14 @@ import (
 	"os"
 	"strconv"
 
-	"gitea.com/gitea/act_runner/config"
 	"gitea.com/gitea/act_runner/engine"
 	"gitea.com/gitea/act_runner/runtime"
 
-	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 const version = "0.1.5"
-
-// initLogging setup the global logrus logger.
-func initLogging(cfg config.Config) {
-	isTerm := isatty.IsTerminal(os.Stdout.Fd())
-	log.SetFormatter(&log.TextFormatter{
-		DisableColors: !isTerm,
-		FullTimestamp: true,
-	})
-
-	if cfg.Debug {
-		log.SetLevel(log.DebugLevel)
-	}
-	if cfg.Trace {
-		log.SetLevel(log.TraceLevel)
-	}
-}
 
 func Execute(ctx context.Context) {
 	task := runtime.NewTask("gitea", 0, nil, nil)

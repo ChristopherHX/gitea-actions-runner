@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"gitea.com/gitea/act_runner/client"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"
+	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -160,5 +162,21 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 				Errorln("shutting down the server")
 		}
 		return err
+	}
+}
+
+// initLogging setup the global logrus logger.
+func initLogging(cfg config.Config) {
+	isTerm := isatty.IsTerminal(os.Stdout.Fd())
+	log.SetFormatter(&log.TextFormatter{
+		DisableColors: !isTerm,
+		FullTimestamp: true,
+	})
+
+	if cfg.Debug {
+		log.SetLevel(log.DebugLevel)
+	}
+	if cfg.Trace {
+		log.SetLevel(log.TraceLevel)
 	}
 }
