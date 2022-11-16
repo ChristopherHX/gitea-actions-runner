@@ -56,8 +56,7 @@ type TaskInput struct {
 	noSkipCheckout     bool
 	// remoteName            string
 
-	ForgeInstance string
-	EnvFile       string
+	EnvFile string
 }
 
 type Task struct {
@@ -73,7 +72,6 @@ func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEn
 	task := &Task{
 		Input: &TaskInput{
 			reuseContainers: false,
-			ForgeInstance:   forgeInstance,
 			envs:            runnerEnvs,
 			noSkipCheckout:  true,
 		},
@@ -170,7 +168,9 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	token := getToken(task)
 	dataContext := task.Context.Fields
 
-	log.Infof("task %v token is %v %v", task.Id, token, dataContext["repository"].GetStringValue())
+	log.Infof("task %v repo is %v %v %v", task.Id, dataContext["repository"].GetStringValue(),
+		dataContext["gitea_default_bots_url"].GetStringValue(),
+		t.client.Address())
 
 	preset := &model.GithubContext{
 		Event:           dataContext["event"].GetStructValue().AsMap(),
@@ -213,7 +213,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		ContainerArchitecture: input.containerArchitecture,
 		ContainerDaemonSocket: input.containerDaemonSocket,
 		UseGitIgnore:          input.useGitIgnore,
-		GitHubInstance:        input.ForgeInstance,
+		GitHubInstance:        t.client.Address(),
 		ContainerCapAdd:       input.containerCapAdd,
 		ContainerCapDrop:      input.containerCapDrop,
 		AutoRemove:            input.autoRemove,
@@ -223,6 +223,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		PresetGitHubContext:   preset,
 		EventJSON:             string(eventJSON),
 		ContainerNamePrefix:   fmt.Sprintf("gitea-task-%d", task.Id),
+		DefaultActionInstance: dataContext["gitea_default_bots_url"].GetStringValue(),
 	}
 	r, err := runner.New(config)
 	if err != nil {

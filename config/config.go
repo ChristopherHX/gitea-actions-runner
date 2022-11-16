@@ -15,12 +15,11 @@ import (
 type (
 	// Config provides the system configuration.
 	Config struct {
-		Debug         bool `envconfig:"GITEA_DEBUG"`
-		Trace         bool `envconfig:"GITEA_TRACE"`
-		Client        Client
-		Runner        Runner
-		Platform      Platform
-		ForgeInstance string
+		Debug    bool `envconfig:"GITEA_DEBUG"`
+		Trace    bool `envconfig:"GITEA_TRACE"`
+		Client   Client
+		Runner   Runner
+		Platform Platform
 	}
 
 	Client struct {
@@ -72,7 +71,6 @@ func FromEnviron() (Config, error) {
 		if runner.Address != "" {
 			cfg.Client.Address = runner.Address
 		}
-		cfg.ForgeInstance = runner.ForgeInstance
 	}
 
 	// runner config

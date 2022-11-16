@@ -72,4 +72,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/nektos/act => gitea.com/gitea/act v0.0.0-20221108101106-28099ee68a88
+replace github.com/nektos/act => gitea.com/gitea/act v0.0.0-20221116100712-3caee171b716

@@ -52,7 +52,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 		runner := &runtime.Runner{
 			Client:        cli,
 			Machine:       cfg.Runner.Name,
-			ForgeInstance: cfg.ForgeInstance,
+			ForgeInstance: cfg.Client.Address,
 			Environ:       cfg.Runner.Environ,
 		}
 
