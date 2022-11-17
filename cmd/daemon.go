@@ -59,6 +59,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 		poller := poller.New(
 			cli,
 			runner.Run,
+			cfg.Runner.Capacity,
 		)
 
 		g.Go(func() error {
@@ -81,7 +82,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 					Errorln("failed to update runner")
 			}
 
-			return poller.Poll(ctx, cfg.Runner.Capacity)
+			return poller.Poll(ctx)
 		})
 
 		g.Go(func() error {
