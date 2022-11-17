@@ -70,19 +70,16 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 	r.stateM.Lock()
 	defer r.stateM.Unlock()
 
+	log.WithFields(entry.Data).Trace(entry.Message)
+
 	timestamp := entry.Time
 	if r.state.StartedAt == nil {
 		r.state.StartedAt = timestamppb.New(timestamp)
 	}
 
-	var step *runnerv1.StepState
-	if v, ok := entry.Data["stepNumber"]; ok {
-		if v, ok := v.(int); ok {
-			step = r.state.Steps[v]
-		}
-	}
+	stage := entry.Data["stage"]
 
-	if step == nil {
+	if stage != "Main" {
 		if v, ok := entry.Data["jobResult"]; ok {
 			if jobResult, ok := r.parseResult(v); ok {
 				r.state.Result = jobResult
@@ -100,10 +97,22 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 		return nil
 	}
 
+	var step *runnerv1.StepState
+	if v, ok := entry.Data["stepNumber"]; ok {
+		if v, ok := v.(int); ok {
+			step = r.state.Steps[v]
+		}
+	}
+	if step == nil {
+		if !r.duringSteps() {
+			r.logRows = append(r.logRows, r.parseLogRow(entry))
+		}
+		return nil
+	}
+
 	if step.StartedAt == nil {
 		step.StartedAt = timestamppb.New(timestamp)
 	}
-
 	if v, ok := entry.Data["raw_output"]; ok {
 		if rawOutput, ok := v.(bool); ok && rawOutput {
 			if step.LogLength == 0 {
@@ -111,10 +120,10 @@ func (r *Reporter) Fire(entry *log.Entry) error {
 			}
 			step.LogLength++
 			r.logRows = append(r.logRows, r.parseLogRow(entry))
-			return nil
 		}
+	} else if !r.duringSteps() {
+		r.logRows = append(r.logRows, r.parseLogRow(entry))
 	}
-
 	if v, ok := entry.Data["stepResult"]; ok {
 		if stepResult, ok := r.parseResult(v); ok {
 			if step.LogLength == 0 {
