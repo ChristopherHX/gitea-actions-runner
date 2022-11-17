@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"runtime"
@@ -41,18 +42,24 @@ func runRegister(ctx context.Context, regArgs *registerArgs, envFile string) fun
 			log.Warnf("Runner in user-mode.")
 		}
 
-		go func() {
-			if err := registerInteractive(envFile); err != nil {
-				// log.Errorln(err)
-				os.Exit(2)
-				return
+		if regArgs.NoInteractive {
+			if err := registerNoInteractive(envFile, regArgs); err != nil {
+				return err
 			}
-			os.Exit(0)
-		}()
+		} else {
+			go func() {
+				if err := registerInteractive(envFile); err != nil {
+					// log.Errorln(err)
+					os.Exit(2)
+					return
+				}
+				os.Exit(0)
+			}()
 
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
-		<-c
+			c := make(chan os.Signal, 1)
+			signal.Notify(c, os.Interrupt)
+			<-c
+		}
 
 		return nil
 	}
@@ -63,6 +70,8 @@ type registerArgs struct {
 	NoInteractive bool
 	InstanceAddr  string
 	Token         string
+	RunnerName    string
+	Labels        string
 }
 
 type registerStage int8
@@ -83,6 +92,16 @@ type registerInputs struct {
 	Token        string
 	RunnerName   string
 	CustomLabels []string
+}
+
+func (r *registerInputs) validate() error {
+	if r.InstanceAddr == "" {
+		return fmt.Errorf("instance address is empty")
+	}
+	if r.Token == "" {
+		return fmt.Errorf("token is empty")
+	}
+	return nil
 }
 
 func (r *registerInputs) assignToNext(stage registerStage, value string) registerStage {
@@ -189,6 +208,31 @@ func printStageHelp(stage registerStage) {
 	case StageWaitingForRegistration:
 		log.Infoln("Waiting for registration...")
 	}
+}
+
+func registerNoInteractive(envFile string, regArgs *registerArgs) error {
+	_ = godotenv.Load(envFile)
+	cfg, _ := config.FromEnviron()
+	inputs := &registerInputs{
+		InstanceAddr: regArgs.InstanceAddr,
+		Token:        regArgs.Token,
+		RunnerName:   regArgs.RunnerName,
+		CustomLabels: strings.Split(regArgs.Labels, ","),
+	}
+	if inputs.RunnerName == "" {
+		inputs.RunnerName, _ = os.Hostname()
+		log.Infof("Runner name is empty, use hostname '%s'.", inputs.RunnerName)
+	}
+	if err := inputs.validate(); err != nil {
+		log.WithError(err).Errorf("Invalid input, please re-run act command.")
+		return nil
+	}
+	if err := doRegister(&cfg, inputs); err != nil {
+		log.Errorf("Failed to register runner: %v", err)
+		return err
+	}
+	log.Infof("Runner registered successfully.")
+	return nil
 }
 
 func doRegister(cfg *config.Config, inputs *registerInputs) error {
