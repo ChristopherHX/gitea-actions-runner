@@ -22,6 +22,7 @@ func New(cli client.Client, dispatch func(context.Context, *runnerv1.Task) error
 		routineGroup: newRoutineGroup(),
 		metric:       &metric{},
 		workerNum:    workerNum,
+		ready:        make(chan struct{}, 1),
 	}
 }
 
