@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"gitea.com/gitea/act_runner/client"
 	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
@@ -28,8 +29,8 @@ type TaskInput struct {
 	// workflowsPath         string
 	// autodetectEvent       bool
 	// eventPath       string
-	reuseContainers bool
-	bindWorkdir     bool
+	// reuseContainers bool
+	// bindWorkdir     bool
 	// secrets         []string
 	envs map[string]string
 	// platforms       []string
@@ -46,17 +47,19 @@ type TaskInput struct {
 	containerArchitecture string
 	containerDaemonSocket string
 	// noWorkflowRecurse     bool
-	useGitIgnore       bool
-	containerCapAdd    []string
-	containerCapDrop   []string
-	autoRemove         bool
+	useGitIgnore     bool
+	containerCapAdd  []string
+	containerCapDrop []string
+	// autoRemove         bool
 	artifactServerPath string
 	artifactServerPort string
 	jsonLogger         bool
-	noSkipCheckout     bool
+	// noSkipCheckout     bool
 	// remoteName            string
 
 	EnvFile string
+
+	containerNetworkMode string
 }
 
 type Task struct {
@@ -71,9 +74,8 @@ type Task struct {
 func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEnvs map[string]string) *Task {
 	task := &Task{
 		Input: &TaskInput{
-			reuseContainers: false,
-			envs:            runnerEnvs,
-			noSkipCheckout:  true,
+			envs:                 runnerEnvs,
+			containerNetworkMode: "bridge", // TODO should be configurable
 		},
 		BuildID: buildID,
 
@@ -197,9 +199,9 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 
 	input := t.Input
 	config := &runner.Config{
-		Workdir:               "/root",
-		BindWorkdir:           input.bindWorkdir,
-		ReuseContainers:       input.reuseContainers,
+		Workdir:               "/" + preset.Repository,
+		BindWorkdir:           false,
+		ReuseContainers:       false,
 		ForcePull:             input.forcePull,
 		ForceRebuild:          input.forceRebuild,
 		LogOutput:             true,
@@ -216,13 +218,15 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		GitHubInstance:        t.client.Address(),
 		ContainerCapAdd:       input.containerCapAdd,
 		ContainerCapDrop:      input.containerCapDrop,
-		AutoRemove:            input.autoRemove,
+		AutoRemove:            true,
 		ArtifactServerPath:    input.artifactServerPath,
 		ArtifactServerPort:    input.artifactServerPort,
-		NoSkipCheckout:        input.noSkipCheckout,
+		NoSkipCheckout:        true,
 		PresetGitHubContext:   preset,
 		EventJSON:             string(eventJSON),
 		ContainerNamePrefix:   fmt.Sprintf("gitea-task-%d", task.Id),
+		ContainerMaxLifetime:  3 * time.Hour, // maybe should be specified by Gitea server
+		ContainerNetworkMode:  input.containerNetworkMode,
 		DefaultActionInstance: dataContext["gitea_default_bots_url"].GetStringValue(),
 	}
 	r, err := runner.New(config)
