@@ -9,9 +9,7 @@ import (
 	"gitea.com/gitea/act_runner/engine"
 	"gitea.com/gitea/act_runner/poller"
 	"gitea.com/gitea/act_runner/runtime"
-	runnerv1 "gitea.com/gitea/proto-go/runner/v1"
 
-	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
@@ -63,41 +61,17 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 		)
 
 		g.Go(func() error {
-			log.WithField("capacity", cfg.Runner.Capacity).
+			l := log.WithField("capacity", cfg.Runner.Capacity).
 				WithField("endpoint", cfg.Client.Address).
 				WithField("os", cfg.Platform.OS).
-				WithField("arch", cfg.Platform.Arch).
-				Infoln("polling the remote server")
+				WithField("arch", cfg.Platform.Arch)
+			l.Infoln("polling the remote server")
 
-			// update runner status to idle
-			log.Infoln("update runner status to idle")
-			if _, err := cli.UpdateRunner(
-				context.Background(),
-				connect.NewRequest(&runnerv1.UpdateRunnerRequest{
-					Status: runnerv1.RunnerStatus_RUNNER_STATUS_IDLE,
-				}),
-			); err != nil {
-				// go on, if return err, the program will be stuck
-				log.WithError(err).
-					Errorln("failed to update runner")
+			if err := poller.Poll(ctx); err != nil {
+				l.Errorf("poller error: %v", err)
 			}
-
-			return poller.Poll(ctx)
-		})
-
-		g.Go(func() error {
-			// wait all workflows done.
 			poller.Wait()
-			// received the shutdown signal
-			<-ctx.Done()
-			log.Infoln("update runner status to offline")
-			_, err := cli.UpdateRunner(
-				context.Background(),
-				connect.NewRequest(&runnerv1.UpdateRunnerRequest{
-					Status: runnerv1.RunnerStatus_RUNNER_STATUS_OFFLINE,
-				}),
-			)
-			return err
+			return nil
 		})
 
 		err = g.Wait()

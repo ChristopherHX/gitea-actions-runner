@@ -38,10 +38,6 @@ type Poller struct {
 	workerNum    int
 }
 
-func (p *Poller) Wait() {
-	p.routineGroup.Wait()
-}
-
 func (p *Poller) schedule() {
 	p.Lock()
 	defer p.Unlock()
@@ -53,6 +49,10 @@ func (p *Poller) schedule() {
 	case p.ready <- struct{}{}:
 	default:
 	}
+}
+
+func (p *Poller) Wait() {
+	p.routineGroup.Wait()
 }
 
 func (p *Poller) Poll(ctx context.Context) error {
@@ -83,19 +83,6 @@ func (p *Poller) Poll(ctx context.Context) error {
 					break
 				}
 
-				// update runner status
-				// running: idle -> active
-				if val := p.metric.IncBusyWorker(); val == 1 {
-					if _, err := p.Client.UpdateRunner(
-						ctx,
-						connect.NewRequest(&runnerv1.UpdateRunnerRequest{
-							Status: runnerv1.RunnerStatus_RUNNER_STATUS_ACTIVE,
-						}),
-					); err != nil {
-						return err
-					}
-					l.Info("update runner status to active")
-				}
 				p.routineGroup.Run(func() {
 					if err := p.dispatchTask(ctx, task); err != nil {
 						l.Errorf("execute task: %v", err.Error())
@@ -144,25 +131,12 @@ func (p *Poller) pollTask(ctx context.Context) (*runnerv1.Task, error) {
 func (p *Poller) dispatchTask(ctx context.Context, task *runnerv1.Task) error {
 	l := log.WithField("func", "dispatchTask")
 	defer func() {
-		val := p.metric.DecBusyWorker()
+		p.metric.DecBusyWorker()
 		e := recover()
 		if e != nil {
 			l.Errorf("panic error: %v", e)
 		}
 		p.schedule()
-
-		if val != 0 {
-			return
-		}
-		if _, err := p.Client.UpdateRunner(
-			ctx,
-			connect.NewRequest(&runnerv1.UpdateRunnerRequest{
-				Status: runnerv1.RunnerStatus_RUNNER_STATUS_IDLE,
-			}),
-		); err != nil {
-			l.Errorln("update status error:", err.Error())
-		}
-		l.Info("update runner status to idle")
 	}()
 
 	runCtx, cancel := context.WithTimeout(ctx, time.Hour)

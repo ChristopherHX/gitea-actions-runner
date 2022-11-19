@@ -105,7 +105,6 @@ func (r *registerInputs) validate() error {
 }
 
 func (r *registerInputs) assignToNext(stage registerStage, value string) registerStage {
-
 	// must set instance address and token.
 	// if empty, keep current stage.
 	if stage == StageInputInstance || stage == StageInputToken {
@@ -141,14 +140,7 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 	return StageUnknown
 }
 
-func getLocalConfigFile(envFile string) (string, bool) {
-	_ = godotenv.Load(envFile)
-	cfg, _ := config.FromEnviron()
-	return cfg.Runner.File, file.IsFile(cfg.Runner.File)
-}
-
 func registerInteractive(envFile string) error {
-
 	var (
 		reader = bufio.NewReader(os.Stdin)
 		stage  = StageInputInstance
@@ -236,7 +228,6 @@ func registerNoInteractive(envFile string, regArgs *registerArgs) error {
 }
 
 func doRegister(cfg *config.Config, inputs *registerInputs) error {
-
 	ctx := context.Background()
 
 	// initial http client
