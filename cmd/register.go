@@ -101,6 +101,20 @@ func (r *registerInputs) validate() error {
 	if r.Token == "" {
 		return fmt.Errorf("token is empty")
 	}
+	if len(r.CustomLabels) > 0 {
+		return validateLabels(r.CustomLabels)
+	}
+	return nil
+}
+
+func validateLabels(labels []string) error {
+	for _, label := range labels {
+		values := strings.SplitN(label, ":", 2)
+		if len(values) != 2 {
+			return fmt.Errorf("Invalid label: %s", label)
+		}
+		// TODO: validate value format, like docker://node:16-buster
+	}
 	return nil
 }
 
@@ -134,7 +148,14 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 		r.RunnerName = value
 		return StageInputCustomLabels
 	case StageInputCustomLabels:
+		if value == "" {
+			return StageWaitingForRegistration
+		}
 		r.CustomLabels = strings.Split(value, ",")
+		if validateLabels(r.CustomLabels) != nil {
+			log.Infoln("Invalid labels, please input again (for example, ubuntu-latest:docker://node:16-buster)")
+			return StageInputCustomLabels
+		}
 		return StageWaitingForRegistration
 	}
 	return StageUnknown
@@ -196,7 +217,7 @@ func printStageHelp(stage registerStage) {
 		hostname, _ := os.Hostname()
 		log.Infof("Enter the runner name (if set empty, use hostname:%s ):\n", hostname)
 	case StageInputCustomLabels:
-		log.Infoln("Enter the runner custom labels (comma-separated, for example, label1,label2):")
+		log.Infoln("Enter the runner custom labels (comma-separated, for example, ubuntu-latest:docker://node:16-buster,ubuntu-2204:docker://node:18-buster):")
 	case StageWaitingForRegistration:
 		log.Infoln("Waiting for registration...")
 	}
@@ -209,7 +230,10 @@ func registerNoInteractive(envFile string, regArgs *registerArgs) error {
 		InstanceAddr: regArgs.InstanceAddr,
 		Token:        regArgs.Token,
 		RunnerName:   regArgs.RunnerName,
-		CustomLabels: strings.Split(regArgs.Labels, ","),
+	}
+	regArgs.Labels = strings.TrimSpace(regArgs.Labels)
+	if regArgs.Labels != "" {
+		inputs.CustomLabels = strings.Split(regArgs.Labels, ",")
 	}
 	if inputs.RunnerName == "" {
 		inputs.RunnerName, _ = os.Hostname()
