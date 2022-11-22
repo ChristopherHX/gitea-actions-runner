@@ -99,12 +99,32 @@ func getWorkflowsPath(dir string) (string, error) {
 	return p, nil
 }
 
-func demoPlatforms() map[string]string {
-	return map[string]string{
+func platformPicker(labels []string) string {
+
+	// FIXME: read custom labels
+
+	preset := map[string]string{
+		// FIXME: shouldn't be the same
 		"ubuntu-latest": "node:16-buster",
+		"ubuntu-22.04":  "node:16-buster",
 		"ubuntu-20.04":  "node:16-buster",
 		"ubuntu-18.04":  "node:16-buster",
 	}
+
+	for _, label := range labels {
+		if v, ok := preset[label]; ok {
+			return v
+		}
+	}
+
+	// TODO: support multiple labels
+	// like:
+	//   ["ubuntu-22.04"] => "ubuntu:22.04"
+	//   ["with-gpu"] => "linux:with-gpu"
+	//   ["ubuntu-22.04", "with-gpu"] => "ubuntu:22.04_with-gpu"
+
+	// FIXME: shall we need to support default?
+	return "node:16-buster"
 }
 
 func getToken(task *runnerv1.Task) string {
@@ -209,7 +229,6 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		Env:                   input.envs,
 		Secrets:               task.Secrets,
 		InsecureSecrets:       input.insecureSecrets,
-		Platforms:             demoPlatforms(), // TODO: supported platforms
 		Privileged:            input.privileged,
 		UsernsMode:            input.usernsMode,
 		ContainerArchitecture: input.containerArchitecture,
@@ -228,6 +247,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		ContainerMaxLifetime:  3 * time.Hour, // maybe should be specified by Gitea server
 		ContainerNetworkMode:  input.containerNetworkMode,
 		DefaultActionInstance: dataContext["gitea_default_bots_url"].GetStringValue(),
+		PlatformPicker:        platformPicker,
 	}
 	r, err := runner.New(config)
 	if err != nil {
