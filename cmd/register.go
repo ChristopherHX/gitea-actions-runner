@@ -295,6 +295,7 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 	)
 	cfg.Runner.Name = inputs.RunnerName
 	cfg.Runner.Token = inputs.Token
+	cfg.Runner.Labels = inputs.CustomLabels
 	_, err := register.Register(ctx, cfg.Runner)
 	if err != nil {
 		log.WithError(err).Errorln("Cannot register the runner")

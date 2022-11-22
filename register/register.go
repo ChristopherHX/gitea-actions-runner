@@ -47,6 +47,7 @@ func (p *Register) Register(ctx context.Context, cfg config.Runner) (*core.Runne
 		Name:    resp.Msg.Runner.Name,
 		Token:   resp.Msg.Runner.Token,
 		Address: p.Client.Address(),
+		Labels:  cfg.Labels,
 	}
 
 	file, err := json.MarshalIndent(data, "", "  ")
