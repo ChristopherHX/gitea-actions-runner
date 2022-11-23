@@ -83,7 +83,10 @@ func (p *Poller) Poll(ctx context.Context) error {
 					break
 				}
 
+				p.metric.IncBusyWorker()
 				p.routineGroup.Run(func() {
+					defer p.schedule()
+					defer p.metric.DecBusyWorker()
 					if err := p.dispatchTask(ctx, task); err != nil {
 						l.Errorf("execute task: %v", err.Error())
 					}
@@ -131,12 +134,10 @@ func (p *Poller) pollTask(ctx context.Context) (*runnerv1.Task, error) {
 func (p *Poller) dispatchTask(ctx context.Context, task *runnerv1.Task) error {
 	l := log.WithField("func", "dispatchTask")
 	defer func() {
-		p.metric.DecBusyWorker()
 		e := recover()
 		if e != nil {
 			l.Errorf("panic error: %v", e)
 		}
-		p.schedule()
 	}()
 
 	runCtx, cancel := context.WithTimeout(ctx, time.Hour)
