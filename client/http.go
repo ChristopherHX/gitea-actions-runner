@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"code.gitea.io/bots-proto-go/ping/v1/pingv1connect"
@@ -51,15 +52,17 @@ func New(endpoint string, opts ...Option) *HTTPClient {
 		}
 	}
 
+	baseURL := strings.TrimRight(endpoint, "/") + "/api/bots"
+
 	return &HTTPClient{
 		PingServiceClient: pingv1connect.NewPingServiceClient(
 			cfg.httpClient,
-			endpoint,
+			baseURL,
 			cfg.opts...,
 		),
 		RunnerServiceClient: runnerv1connect.NewRunnerServiceClient(
 			cfg.httpClient,
-			endpoint,
+			baseURL,
 			cfg.opts...,
 		),
 		endpoint: endpoint,
