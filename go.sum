@@ -25,8 +25,8 @@ cloud.google.com/go/storage v1.6.0/go.mod h1:N7U0C8pVQ/+NIKOBQyamJIeKQKkZ+mxpohl
 code.gitea.io/bots-proto-go v0.1.0 h1:H+01Pcb7j6+l3TDj/0YFOJvPYbcKkzSBXg1qoGz/qc8=
 code.gitea.io/bots-proto-go v0.1.0/go.mod h1:tZCdF4XQ1216T+JUHw2A091PA/QP3HLx7IXPv1l3v5c=
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
-gitea.com/gitea/act v0.233.4 h1:ItqivoomnfTTeXZ/hqlSQFlgA0TBv40U3dbg0gYUYKk=
-gitea.com/gitea/act v0.233.4/go.mod h1:QpHTbzW4rX/jfN9qnfPdPC5Us0JZPxfPeEaAv18VVrQ=
+gitea.com/gitea/act v0.233.5 h1:XXJwuWC+J9XkWokCRg1s16Oc46aZ6gQ27MNd2C/RqHY=
+gitea.com/gitea/act v0.233.5/go.mod h1:QpHTbzW4rX/jfN9qnfPdPC5Us0JZPxfPeEaAv18VVrQ=
 github.com/Azure/azure-sdk-for-go v16.2.1+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 h1:w+iIsaOQNcT7OZ575w+acHgRric5iCyQh+xv+KJ4HB8=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78/go.mod h1:LmzpDX56iTiv29bbRTIsUNlaFfuhWRQBWjQdVyAevI8=

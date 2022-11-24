@@ -191,6 +191,11 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		return err
 	}
 
+	maxLifetime := 3 * time.Hour
+	if deadline, ok := ctx.Deadline(); ok {
+		maxLifetime = time.Until(deadline)
+	}
+
 	input := t.Input
 	config := &runner.Config{
 		Workdir:               "/" + preset.Repository,
@@ -217,8 +222,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		NoSkipCheckout:        true,
 		PresetGitHubContext:   preset,
 		EventJSON:             string(eventJSON),
-		ContainerNamePrefix:   fmt.Sprintf("gitea-task-%d", task.Id),
-		ContainerMaxLifetime:  3 * time.Hour, // maybe should be specified by Gitea server
+		ContainerNamePrefix:   fmt.Sprintf("GITEA-BOTS-TASK-%d", task.Id),
+		ContainerMaxLifetime:  maxLifetime,
 		ContainerNetworkMode:  input.containerNetworkMode,
 		DefaultActionInstance: dataContext["gitea_default_bots_url"].GetStringValue(),
 		PlatformPicker:        t.platformPicker,
