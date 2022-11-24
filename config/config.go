@@ -7,7 +7,7 @@ import (
 	"runtime"
 
 	"gitea.com/gitea/act_runner/core"
-	"github.com/appleboy/com/file"
+
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 )
@@ -54,7 +54,7 @@ func FromEnviron() (Config, error) {
 	}
 
 	// check runner config exist
-	if file.IsFile(cfg.Runner.File) {
+	if f, err := os.Stat(cfg.Runner.File); err == nil && !f.IsDir() {
 		jsonFile, _ := os.Open(cfg.Runner.File)
 		defer jsonFile.Close()
 		byteValue, _ := io.ReadAll(jsonFile)
@@ -67,6 +67,9 @@ func FromEnviron() (Config, error) {
 		}
 		if runner.Token != "" {
 			cfg.Runner.Token = runner.Token
+		}
+		if len(runner.Labels) != 0 {
+			cfg.Runner.Labels = runner.Labels
 		}
 		if runner.Address != "" {
 			cfg.Client.Address = runner.Address

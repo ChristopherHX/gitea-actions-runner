@@ -28,7 +28,6 @@ func New(cli client.Client, dispatch func(context.Context, *runnerv1.Task) error
 
 type Poller struct {
 	Client   client.Client
-	Filter   *client.Filter
 	Dispatch func(context.Context, *runnerv1.Task) error
 
 	sync.Mutex

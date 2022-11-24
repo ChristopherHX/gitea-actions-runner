@@ -52,6 +52,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			Machine:       cfg.Runner.Name,
 			ForgeInstance: cfg.Client.Address,
 			Environ:       cfg.Runner.Environ,
+			Labels:        cfg.Runner.Labels,
 		}
 
 		poller := poller.New(

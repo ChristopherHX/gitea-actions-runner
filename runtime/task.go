@@ -66,12 +66,13 @@ type Task struct {
 	BuildID int64
 	Input   *TaskInput
 
-	client client.Client
-	log    *log.Entry
+	client         client.Client
+	log            *log.Entry
+	platformPicker func([]string) string
 }
 
 // NewTask creates a new task
-func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEnvs map[string]string) *Task {
+func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEnvs map[string]string, picker func([]string) string) *Task {
 	task := &Task{
 		Input: &TaskInput{
 			envs:                 runnerEnvs,
@@ -79,8 +80,9 @@ func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEn
 		},
 		BuildID: buildID,
 
-		client: client,
-		log:    log.WithField("buildID", buildID),
+		client:         client,
+		log:            log.WithField("buildID", buildID),
+		platformPicker: picker,
 	}
 	task.Input.repoDirectory, _ = os.Getwd()
 	return task
@@ -97,34 +99,6 @@ func getWorkflowsPath(dir string) (string, error) {
 		return filepath.Join(dir, ".github/workflows"), nil
 	}
 	return p, nil
-}
-
-func platformPicker(labels []string) string {
-
-	// FIXME: read custom labels
-
-	preset := map[string]string{
-		// FIXME: shouldn't be the same
-		"ubuntu-latest": "node:16-buster",
-		"ubuntu-22.04":  "node:16-buster",
-		"ubuntu-20.04":  "node:16-buster",
-		"ubuntu-18.04":  "node:16-buster",
-	}
-
-	for _, label := range labels {
-		if v, ok := preset[label]; ok {
-			return v
-		}
-	}
-
-	// TODO: support multiple labels
-	// like:
-	//   ["ubuntu-22.04"] => "ubuntu:22.04"
-	//   ["with-gpu"] => "linux:with-gpu"
-	//   ["ubuntu-22.04", "with-gpu"] => "ubuntu:22.04_with-gpu"
-
-	// FIXME: shall we need to support default?
-	return "node:16-buster"
 }
 
 func getToken(task *runnerv1.Task) string {
@@ -247,7 +221,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		ContainerMaxLifetime:  3 * time.Hour, // maybe should be specified by Gitea server
 		ContainerNetworkMode:  input.containerNetworkMode,
 		DefaultActionInstance: dataContext["gitea_default_bots_url"].GetStringValue(),
-		PlatformPicker:        platformPicker,
+		PlatformPicker:        t.platformPicker,
 	}
 	r, err := runner.New(config)
 	if err != nil {

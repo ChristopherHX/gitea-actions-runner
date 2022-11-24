@@ -14,7 +14,7 @@ import (
 	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/config"
 	"gitea.com/gitea/act_runner/register"
-	"github.com/appleboy/com/file"
+
 	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
@@ -148,12 +148,19 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 		r.RunnerName = value
 		return StageInputCustomLabels
 	case StageInputCustomLabels:
-		if value == "" {
-			return StageWaitingForRegistration
+		if value != "" {
+			r.CustomLabels = strings.Split(value, ",")
+		} else {
+			r.CustomLabels = []string{
+				"ubuntu-latest:docker://node:16-bullseye",
+				"ubuntu-22.04:docker://node:16-bullseye", // There's no node:16-bookworm yet
+				"ubuntu-20.04:docker://node:16-bullseye",
+				"ubuntu-18.04:docker://node:16-buster",
+			}
 		}
-		r.CustomLabels = strings.Split(value, ",")
+
 		if validateLabels(r.CustomLabels) != nil {
-			log.Infoln("Invalid labels, please input again (for example, ubuntu-latest:docker://node:16-buster)")
+			log.Infoln("Invalid labels, please input again, leave blank to use the default labels (for example, ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster)")
 			return StageInputCustomLabels
 		}
 		return StageWaitingForRegistration
@@ -171,7 +178,7 @@ func registerInteractive(envFile string) error {
 	// check if overwrite local config
 	_ = godotenv.Load(envFile)
 	cfg, _ := config.FromEnviron()
-	if file.IsFile(cfg.Runner.File) {
+	if f, err := os.Stat(cfg.Runner.File); err == nil && !f.IsDir() {
 		stage = StageOverwriteLocalConfig
 	}
 
@@ -217,7 +224,7 @@ func printStageHelp(stage registerStage) {
 		hostname, _ := os.Hostname()
 		log.Infof("Enter the runner name (if set empty, use hostname:%s ):\n", hostname)
 	case StageInputCustomLabels:
-		log.Infoln("Enter the runner custom labels (comma-separated, for example, ubuntu-latest:docker://node:16-buster,ubuntu-2204:docker://node:18-buster):")
+		log.Infoln("Enter the runner labels, leave blank to use the default labels (comma-separated, for example, ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster):")
 	case StageWaitingForRegistration:
 		log.Infoln("Waiting for registration...")
 	}
@@ -285,18 +292,10 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 		}
 	}
 
-	register := register.New(
-		cli,
-		&client.Filter{
-			OS:     cfg.Platform.OS,
-			Arch:   cfg.Platform.Arch,
-			Labels: inputs.CustomLabels,
-		},
-	)
 	cfg.Runner.Name = inputs.RunnerName
 	cfg.Runner.Token = inputs.Token
 	cfg.Runner.Labels = inputs.CustomLabels
-	_, err := register.Register(ctx, cfg.Runner)
+	_, err := register.New(cli).Register(ctx, cfg.Runner)
 	if err != nil {
 		log.WithError(err).Errorln("Cannot register the runner")
 		return nil

@@ -4,7 +4,6 @@ go 1.18
 
 require (
 	code.gitea.io/bots-proto-go v0.1.0
-	github.com/appleboy/com v0.1.6
 	github.com/avast/retry-go/v4 v4.1.0
 	github.com/bufbuild/connect-go v1.1.0
 	github.com/docker/docker v20.10.21+incompatible

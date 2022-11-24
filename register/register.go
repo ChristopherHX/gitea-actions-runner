@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 
 	runnerv1 "code.gitea.io/bots-proto-go/runner/v1"
 	"gitea.com/gitea/act_runner/client"
@@ -14,27 +15,26 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var defaultLabels = []string{"self-hosted"}
-
-func New(cli client.Client, filter *client.Filter) *Register {
+func New(cli client.Client) *Register {
 	return &Register{
 		Client: cli,
-		Filter: filter,
 	}
 }
 
 type Register struct {
 	Client client.Client
-	Filter *client.Filter
 }
 
 func (p *Register) Register(ctx context.Context, cfg config.Runner) (*core.Runner, error) {
+	labels := make([]string, len(cfg.Labels))
+	for i, v := range cfg.Labels {
+		labels[i] = strings.SplitN(v, ":", 2)[0]
+	}
 	// register new runner.
 	resp, err := p.Client.Register(ctx, connect.NewRequest(&runnerv1.RegisterRequest{
-		Name:         cfg.Name,
-		Token:        cfg.Token,
-		AgentLabels:  append(defaultLabels, []string{p.Filter.OS, p.Filter.Arch}...),
-		CustomLabels: p.Filter.Labels,
+		Name:        cfg.Name,
+		Token:       cfg.Token,
+		AgentLabels: labels,
 	}))
 	if err != nil {
 		log.WithError(err).Error("poller: cannot register new runner")
