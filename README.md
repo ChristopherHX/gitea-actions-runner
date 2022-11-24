@@ -4,15 +4,15 @@ Act runner is a runner for Forges supports Github Actions protocol.
 
 ## Quickstart
 
-### build
+### Build
 
-```shell
+```bash
 make build
 ```
 
-### register
+### Register
 
-```shell
+```bash
 ./act_runner register
 ```
 
@@ -24,6 +24,7 @@ And you will be asked to input:
 4. Runner labels, you can just leave it blank.
 
 The process looks like:
+
 ```text
 INFO Registering runner, arch=amd64, os=darwin, version=0.1.5.
 WARN Runner in user-mode.
@@ -40,8 +41,8 @@ DEBU Successfully pinged the Gitea instance server
 INFO Runner registered successfully.
 ```
 
-### run
+### Run
 
-```shell
+```bash
 ./act_runner daemon
 ```
