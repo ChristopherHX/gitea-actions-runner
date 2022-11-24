@@ -252,7 +252,7 @@ func registerNoInteractive(envFile string, regArgs *registerArgs) error {
 	}
 	if err := doRegister(&cfg, inputs); err != nil {
 		log.Errorf("Failed to register runner: %v", err)
-		return err
+		return nil
 	}
 	log.Infof("Runner registered successfully.")
 	return nil
@@ -296,10 +296,5 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 	cfg.Runner.Token = inputs.Token
 	cfg.Runner.Labels = inputs.CustomLabels
 	_, err := register.New(cli).Register(ctx, cfg.Runner)
-	if err != nil {
-		log.WithError(err).Errorln("Cannot register the runner")
-		return nil
-	}
-
-	return nil
+	return err
 }
