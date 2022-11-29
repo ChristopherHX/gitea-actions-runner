@@ -264,9 +264,7 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 	// initial http client
 	cli := client.New(
 		inputs.InstanceAddr,
-		client.WithSkipVerify(cfg.Client.SkipVerify),
-		client.WithGRPC(cfg.Client.GRPC),
-		client.WithGRPCWeb(cfg.Client.GRPCWeb),
+		"", "",
 	)
 
 	for {

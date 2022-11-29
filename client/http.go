@@ -1,69 +1,41 @@
 package client
 
 import (
-	"crypto/tls"
-	"net"
-	"net/http"
-	"strings"
-	"time"
-
 	"code.gitea.io/bots-proto-go/ping/v1/pingv1connect"
 	"code.gitea.io/bots-proto-go/runner/v1/runnerv1connect"
-
-	"golang.org/x/net/http2"
+	"context"
+	"gitea.com/gitea/act_runner/core"
+	"github.com/bufbuild/connect-go"
+	"net/http"
+	"strings"
 )
 
 // New returns a new runner client.
-func New(endpoint string, opts ...Option) *HTTPClient {
-	cfg := &config{}
-
-	// Loop through each option
-	for _, opt := range opts {
-		// Call the option giving the instantiated
-		opt.apply(cfg)
-	}
-
-	if cfg.httpClient == nil {
-		cfg.httpClient = &http.Client{
-			Timeout: 1 * time.Minute,
-			CheckRedirect: func(*http.Request, []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-			Transport: &http2.Transport{
-				AllowHTTP: true,
-				DialTLS: func(netw, addr string, cfg *tls.Config) (net.Conn, error) {
-					return net.Dial(netw, addr)
-				},
-			},
-		}
-	}
-
-	if cfg.skipVerify {
-		cfg.httpClient = &http.Client{
-			CheckRedirect: func(*http.Request, []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true,
-				},
-			},
-		}
-	}
-
+func New(endpoint string, uuid, token string, opts ...connect.ClientOption) *HTTPClient {
 	baseURL := strings.TrimRight(endpoint, "/") + "/api/bots"
+
+	opts = append(opts, connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
+		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+			if uuid != "" {
+				req.Header().Set(core.UUIDHeader, uuid)
+			}
+			if token != "" {
+				req.Header().Set(core.TokenHeader, token)
+			}
+			return next(ctx, req)
+		}
+	})))
 
 	return &HTTPClient{
 		PingServiceClient: pingv1connect.NewPingServiceClient(
-			cfg.httpClient,
+			http.DefaultClient,
 			baseURL,
-			cfg.opts...,
+			opts...,
 		),
 		RunnerServiceClient: runnerv1connect.NewRunnerServiceClient(
-			cfg.httpClient,
+			http.DefaultClient,
 			baseURL,
-			cfg.opts...,
+			opts...,
 		),
 		endpoint: endpoint,
 	}

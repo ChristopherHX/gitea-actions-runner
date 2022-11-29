@@ -40,11 +40,8 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 
 		cli := client.New(
 			cfg.Client.Address,
-			client.WithSkipVerify(cfg.Client.SkipVerify),
-			client.WithGRPC(cfg.Client.GRPC),
-			client.WithGRPCWeb(cfg.Client.GRPCWeb),
-			client.WithUUIDHeader(cfg.Runner.UUID),
-			client.WithTokenHeader(cfg.Runner.Token),
+			cfg.Runner.UUID,
+			cfg.Runner.Token,
 		)
 
 		runner := &runtime.Runner{

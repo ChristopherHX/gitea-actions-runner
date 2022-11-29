@@ -23,10 +23,7 @@ type (
 	}
 
 	Client struct {
-		Address    string `ignored:"true"`
-		SkipVerify bool   `envconfig:"GITEA_RPC_SKIP_VERIFY"`
-		GRPC       bool   `envconfig:"GITEA_RPC_GRPC" default:"true"`
-		GRPCWeb    bool   `envconfig:"GITEA_RPC_GRPC_WEB"`
+		Address string `ignored:"true"`
 	}
 
 	Runner struct {
