@@ -87,6 +87,15 @@ const (
 	StageExit
 )
 
+var (
+	defaultLabels = []string{
+		"ubuntu-latest:docker://node:16-bullseye",
+		"ubuntu-22.04:docker://node:16-bullseye", // There's no node:16-bookworm yet
+		"ubuntu-20.04:docker://node:16-bullseye",
+		"ubuntu-18.04:docker://node:16-buster",
+	}
+)
+
 type registerInputs struct {
 	InstanceAddr string
 	Token        string
@@ -148,15 +157,9 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 		r.RunnerName = value
 		return StageInputCustomLabels
 	case StageInputCustomLabels:
+		r.CustomLabels = defaultLabels
 		if value != "" {
 			r.CustomLabels = strings.Split(value, ",")
-		} else {
-			r.CustomLabels = []string{
-				"ubuntu-latest:docker://node:16-bullseye",
-				"ubuntu-22.04:docker://node:16-bullseye", // There's no node:16-bookworm yet
-				"ubuntu-20.04:docker://node:16-bullseye",
-				"ubuntu-18.04:docker://node:16-buster",
-			}
 		}
 
 		if validateLabels(r.CustomLabels) != nil {
@@ -237,6 +240,7 @@ func registerNoInteractive(envFile string, regArgs *registerArgs) error {
 		InstanceAddr: regArgs.InstanceAddr,
 		Token:        regArgs.Token,
 		RunnerName:   regArgs.RunnerName,
+		CustomLabels: defaultLabels,
 	}
 	regArgs.Labels = strings.TrimSpace(regArgs.Labels)
 	if regArgs.Labels != "" {
