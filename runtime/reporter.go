@@ -285,7 +285,7 @@ func (r *Reporter) parseResult(result interface{}) (runnerv1.Result, bool) {
 }
 
 func (r *Reporter) parseLogRow(entry *log.Entry) *runnerv1.LogRow {
-	content := strings.TrimSuffix(entry.Message, "\r\n")
+	content := strings.TrimRightFunc(entry.Message, func(r rune) bool { return r == '\r' || r == '\n' })
 	content = r.logReplacer.Replace(content)
 	return &runnerv1.LogRow{
 		Time:    timestamppb.New(entry.Time),
