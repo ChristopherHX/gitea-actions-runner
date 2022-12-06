@@ -1,8 +1,8 @@
 package client
 
 import (
-	"code.gitea.io/bots-proto-go/ping/v1/pingv1connect"
-	"code.gitea.io/bots-proto-go/runner/v1/runnerv1connect"
+	"code.gitea.io/actions-proto-go/ping/v1/pingv1connect"
+	"code.gitea.io/actions-proto-go/runner/v1/runnerv1connect"
 	"context"
 	"gitea.com/gitea/act_runner/core"
 	"github.com/bufbuild/connect-go"
@@ -12,7 +12,7 @@ import (
 
 // New returns a new runner client.
 func New(endpoint string, uuid, token string, opts ...connect.ClientOption) *HTTPClient {
-	baseURL := strings.TrimRight(endpoint, "/") + "/api/bots"
+	baseURL := strings.TrimRight(endpoint, "/") + "/api/actions"
 
 	opts = append(opts, connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {

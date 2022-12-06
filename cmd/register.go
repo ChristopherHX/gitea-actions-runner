@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	pingv1 "code.gitea.io/bots-proto-go/ping/v1"
+	pingv1 "code.gitea.io/actions-proto-go/ping/v1"
 	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/config"
 	"gitea.com/gitea/act_runner/register"

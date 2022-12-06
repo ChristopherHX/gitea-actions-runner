@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	runnerv1 "code.gitea.io/bots-proto-go/runner/v1"
+	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/config"
 	"gitea.com/gitea/act_runner/core"

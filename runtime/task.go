@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	runnerv1 "code.gitea.io/bots-proto-go/runner/v1"
+	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"gitea.com/gitea/act_runner/client"
 
 	"github.com/nektos/act/pkg/artifacts"
@@ -165,7 +165,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	dataContext := task.Context.Fields
 
 	log.Infof("task %v repo is %v %v %v", task.Id, dataContext["repository"].GetStringValue(),
-		dataContext["gitea_default_bots_url"].GetStringValue(),
+		dataContext["gitea_default_actions_url"].GetStringValue(),
 		t.client.Address())
 
 	preset := &model.GithubContext{
@@ -222,10 +222,10 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		NoSkipCheckout:        true,
 		PresetGitHubContext:   preset,
 		EventJSON:             string(eventJSON),
-		ContainerNamePrefix:   fmt.Sprintf("GITEA-BOTS-TASK-%d", task.Id),
+		ContainerNamePrefix:   fmt.Sprintf("GITEA-ACTIONS-TASK-%d", task.Id),
 		ContainerMaxLifetime:  maxLifetime,
 		ContainerNetworkMode:  input.containerNetworkMode,
-		DefaultActionInstance: dataContext["gitea_default_bots_url"].GetStringValue(),
+		DefaultActionInstance: dataContext["gitea_default_actions_url"].GetStringValue(),
 		PlatformPicker:        t.platformPicker,
 	}
 	r, err := runner.New(config)

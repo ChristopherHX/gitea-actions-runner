@@ -3,9 +3,9 @@ module gitea.com/gitea/act_runner
 go 1.18
 
 require (
-	code.gitea.io/bots-proto-go v0.1.0
-	github.com/avast/retry-go/v4 v4.1.0
-	github.com/bufbuild/connect-go v1.1.0
+	code.gitea.io/actions-proto-go v0.2.0
+	github.com/avast/retry-go/v4 v4.3.1
+	github.com/bufbuild/connect-go v1.3.1
 	github.com/docker/docker v20.10.21+incompatible
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -25,6 +25,7 @@ require (
 	github.com/acomagu/bufpipe v1.0.3 // indirect
 	github.com/containerd/cgroups v1.0.3 // indirect
 	github.com/containerd/containerd v1.6.6 // indirect
+	github.com/creack/pty v1.1.18 // indirect
 	github.com/docker/cli v20.10.21+incompatible // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.6.4 // indirect
@@ -49,7 +50,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
-	github.com/moby/buildkit v0.10.5 // indirect
+	github.com/moby/buildkit v0.10.6 // indirect
 	github.com/moby/sys/mount v0.3.1 // indirect
 	github.com/moby/sys/mountinfo v0.6.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -57,7 +58,7 @@ require (
 	github.com/opencontainers/runc v1.1.2 // indirect
 	github.com/opencontainers/selinux v1.10.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rhysd/actionlint v1.6.21 // indirect
+	github.com/rhysd/actionlint v1.6.22 // indirect
 	github.com/rivo/uniseg v0.3.4 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
@@ -76,4 +77,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/nektos/act => gitea.com/gitea/act v0.233.5
+replace github.com/nektos/act => gitea.com/gitea/act v0.234.0
