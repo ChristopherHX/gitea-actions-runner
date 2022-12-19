@@ -218,7 +218,7 @@ func registerInteractive(envFile string) error {
 func printStageHelp(stage registerStage) {
 	switch stage {
 	case StageOverwriteLocalConfig:
-		log.Infoln("Runner is already registered, overwrite local config? [Y/n]")
+		log.Infoln("Runner is already registered, overwrite local config? [y/N]")
 	case StageInputInstance:
 		log.Infoln("Enter the Gitea instance URL (for example, https://gitea.com/):")
 	case StageInputToken:
