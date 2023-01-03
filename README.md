@@ -2,6 +2,10 @@
 
 Act runner is a runner for Gitea based on [act](https://gitea.com/gitea/act).
 
+## Prerequisites
+
+Docker Engine Community version is required. To install Docker CE, follow the official [install instructions](https://docs.docker.com/engine/install/).
+
 ## Quickstart
 
 ### Build
