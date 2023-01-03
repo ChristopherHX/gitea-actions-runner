@@ -3,20 +3,25 @@ package runtime
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
+	"strings"
 	"sync"
-	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
+	"gitea.com/gitea/act_runner/actions/server"
 	"gitea.com/gitea/act_runner/client"
 
-	"github.com/nektos/act/pkg/artifacts"
-	"github.com/nektos/act/pkg/common"
+	"github.com/ChristopherHX/github-act-runner/protocol"
+	"github.com/google/uuid"
 	"github.com/nektos/act/pkg/model"
-	"github.com/nektos/act/pkg/runner"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -161,96 +166,164 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 
 	log.Infof("plan: %+v", plan.Stages[0].Runs)
 
-	token := getToken(task)
 	dataContext := task.Context.Fields
 
 	log.Infof("task %v repo is %v %v %v", task.Id, dataContext["repository"].GetStringValue(),
 		dataContext["gitea_default_actions_url"].GetStringValue(),
 		t.client.Address())
 
-	preset := &model.GithubContext{
-		Event:           dataContext["event"].GetStructValue().AsMap(),
-		RunID:           dataContext["run_id"].GetStringValue(),
-		RunNumber:       dataContext["run_number"].GetStringValue(),
-		Actor:           dataContext["actor"].GetStringValue(),
-		Repository:      dataContext["repository"].GetStringValue(),
-		EventName:       dataContext["event_name"].GetStringValue(),
-		Sha:             dataContext["sha"].GetStringValue(),
-		Ref:             dataContext["ref"].GetStringValue(),
-		RefName:         dataContext["ref_name"].GetStringValue(),
-		RefType:         dataContext["ref_type"].GetStringValue(),
-		HeadRef:         dataContext["head_ref"].GetStringValue(),
-		BaseRef:         dataContext["base_ref"].GetStringValue(),
-		Token:           token,
-		RepositoryOwner: dataContext["repository_owner"].GetStringValue(),
-		RetentionDays:   dataContext["retention_days"].GetStringValue(),
+	// maxLifetime := 3 * time.Hour
+	// if deadline, ok := ctx.Deadline(); ok {
+	// 	maxLifetime = time.Until(deadline)
+	// }
+
+	httpServer := &http.Server{Addr: "0.0.0.0:3403", Handler: &server.ActionsServer{
+		Client: t.client,
+		Task:   task,
+	}}
+
+	go func() {
+		httpServer.ListenAndServe()
+	}()
+
+	steps := []protocol.ActionStep{}
+	for _, s := range job.Steps {
+		displayName := &protocol.TemplateToken{}
+		displayName.FromRawObject(s.Name)
+		if s.Run != "" {
+			inputs := &protocol.TemplateToken{}
+			inputs.FromRawObject(map[interface{}]interface{}{
+				"script": s.Run,
+			})
+			steps = append(steps, protocol.ActionStep{
+				Type: "action",
+				Reference: protocol.ActionStepDefinitionReference{
+					Type: "script",
+				},
+				Inputs:           inputs,
+				Condition:        s.If.Value,
+				DisplayNameToken: displayName,
+				ContextName:      s.ID,
+			})
+		} else {
+			uses := s.Uses
+			nameAndPathOrRef := strings.Split(uses, "@")
+			nameAndPath := strings.Split(nameAndPathOrRef[0], "/")
+			var reference protocol.ActionStepDefinitionReference
+			if nameAndPath[0] == "." {
+				reference = protocol.ActionStepDefinitionReference{
+					Type:           "repository",
+					Path:           path.Join(nameAndPath[1:]...),
+					Ref:            nameAndPathOrRef[1],
+					RepositoryType: "self",
+				}
+			} else {
+				reference = protocol.ActionStepDefinitionReference{
+					Type:           "repository",
+					Name:           path.Join(nameAndPath[0:1]...),
+					Path:           path.Join(nameAndPath[2:]...),
+					Ref:            nameAndPathOrRef[1],
+					RepositoryType: "GitHub",
+				}
+			}
+			rawIn := map[interface{}]interface{}{}
+			for k, v := range s.With {
+				rawIn[k] = v
+			}
+			inputs := &protocol.TemplateToken{}
+			inputs.FromRawObject(rawIn)
+			steps = append(steps, protocol.ActionStep{
+				Type:             "action",
+				Reference:        reference,
+				Inputs:           inputs,
+				Condition:        s.If.Value,
+				DisplayNameToken: displayName,
+				ContextName:      s.ID,
+			})
+		}
 	}
-	eventJSON, err := json.Marshal(preset.Event)
+
+	jmessage := &protocol.AgentJobRequestMessage{
+		MessageType: "jobRequest",
+		Plan: &protocol.TaskOrchestrationPlanReference{
+			ScopeIdentifier: uuid.New().String(),
+			PlanID:          uuid.New().String(),
+			PlanType:        "free",
+		},
+		Timeline: &protocol.TimeLineReference{
+			ID: uuid.New().String(),
+		},
+		Resources: &protocol.JobResources{
+			Endpoints: []protocol.JobEndpoint{
+				{
+					Name: "SYSTEMVSSCONNECTION",
+					Data: map[string]string{},
+					URL:  "http://localhost:3403/",
+					Authorization: protocol.JobAuthorization{
+						Scheme: "OAuth",
+						Parameters: map[string]string{
+							"AccessToken": "Hello World",
+						},
+					},
+				},
+			},
+		},
+		JobID:          uuid.New().String(),
+		JobDisplayName: "test ()",
+		JobName:        "test",
+		RequestID:      475,
+		LockedUntil:    "0001-01-01T00:00:00",
+		Steps:          steps,
+		Variables:      map[string]protocol.VariableValue{},
+		ContextData: map[string]protocol.PipelineContextData{
+			"github": server.ToPipelineContextData(task.Context.AsMap()),
+		},
+	}
+
+	src, _ := json.Marshal(jmessage)
+	jobExecCtx := ctx
+
+	worker := exec.Command("pwsh", "C:\\Users\\Christopher\\runner.server\\invokeWorkerStdIn.ps1", "C:\\Users\\Christopher\\AppData\\Local\\gharun\\runner\\2.299.1\\bin\\Runner.Worker.exe")
+	in, err := worker.StdinPipe()
 	if err != nil {
-		lastWords = err.Error()
 		return err
 	}
-
-	maxLifetime := 3 * time.Hour
-	if deadline, ok := ctx.Deadline(); ok {
-		maxLifetime = time.Until(deadline)
-	}
-
-	input := t.Input
-	config := &runner.Config{
-		Workdir:               "/" + preset.Repository,
-		BindWorkdir:           false,
-		ReuseContainers:       false,
-		ForcePull:             input.forcePull,
-		ForceRebuild:          input.forceRebuild,
-		LogOutput:             true,
-		JSONLogger:            input.jsonLogger,
-		Env:                   input.envs,
-		Secrets:               task.Secrets,
-		InsecureSecrets:       input.insecureSecrets,
-		Privileged:            input.privileged,
-		UsernsMode:            input.usernsMode,
-		ContainerArchitecture: input.containerArchitecture,
-		ContainerDaemonSocket: input.containerDaemonSocket,
-		UseGitIgnore:          input.useGitIgnore,
-		GitHubInstance:        t.client.Address(),
-		ContainerCapAdd:       input.containerCapAdd,
-		ContainerCapDrop:      input.containerCapDrop,
-		AutoRemove:            true,
-		ArtifactServerPath:    input.artifactServerPath,
-		ArtifactServerPort:    input.artifactServerPort,
-		NoSkipCheckout:        true,
-		PresetGitHubContext:   preset,
-		EventJSON:             string(eventJSON),
-		ContainerNamePrefix:   fmt.Sprintf("GITEA-ACTIONS-TASK-%d", task.Id),
-		ContainerMaxLifetime:  maxLifetime,
-		ContainerNetworkMode:  input.containerNetworkMode,
-		DefaultActionInstance: dataContext["gitea_default_actions_url"].GetStringValue(),
-		PlatformPicker:        t.platformPicker,
-	}
-	r, err := runner.New(config)
+	er, err := worker.StderrPipe()
 	if err != nil {
-		lastWords = err.Error()
 		return err
 	}
-
-	artifactCancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
-	t.log.Debugf("artifacts server started at %s:%s", input.artifactServerPath, input.artifactServerPort)
-
-	executor := r.NewPlanExecutor(plan).Finally(func(ctx context.Context) error {
-		artifactCancel()
-		return nil
-	})
-
-	t.log.Infof("workflow prepared")
-	reporter.Logf("workflow prepared")
-
-	// add logger recorders
-	ctx = common.WithLoggerHook(ctx, reporter)
-
-	if err := executor(ctx); err != nil {
-		lastWords = err.Error()
+	out, err := worker.StdoutPipe()
+	if err != nil {
 		return err
+	}
+	err = worker.Start()
+	if err != nil {
+		return err
+	}
+	mid := make([]byte, 4)
+	binary.BigEndian.PutUint32(mid, 1) // NewJobRequest
+	in.Write(mid)
+	binary.BigEndian.PutUint32(mid, uint32(len(src)))
+	in.Write(mid)
+	in.Write(src)
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-jobExecCtx.Done():
+			binary.BigEndian.PutUint32(mid, 2) // CancelRequest
+			in.Write(mid)
+			binary.BigEndian.PutUint32(mid, uint32(len(src)))
+			in.Write(mid)
+			in.Write(src)
+		case <-done:
+		}
+	}()
+	io.Copy(os.Stdout, out)
+	io.Copy(os.Stdout, er)
+	worker.Wait()
+	if exitcode := worker.ProcessState.ExitCode(); exitcode != 0 {
+		return fmt.Errorf("failed to execute worker: %v", exitcode)
 	}
 
 	return nil

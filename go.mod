@@ -4,13 +4,14 @@ go 1.18
 
 require (
 	code.gitea.io/actions-proto-go v0.2.0
+	github.com/ChristopherHX/github-act-runner v0.4.2
 	github.com/avast/retry-go/v4 v4.3.1
 	github.com/bufbuild/connect-go v1.3.1
 	github.com/docker/docker v20.10.21+incompatible
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mattn/go-isatty v0.0.16
-	github.com/nektos/act v0.0.0
+	github.com/nektos/act v0.2.22
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
@@ -38,8 +39,10 @@ require (
 	github.com/go-git/go-git/v5 v5.4.2 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -49,7 +52,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/mapstructure v1.1.2 // indirect
+	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/moby/buildkit v0.10.6 // indirect
 	github.com/moby/sys/mount v0.3.1 // indirect
 	github.com/moby/sys/mountinfo v0.6.0 // indirect
