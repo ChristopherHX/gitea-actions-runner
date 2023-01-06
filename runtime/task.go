@@ -14,12 +14,15 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"gitea.com/gitea/act_runner/actions/server"
 	"gitea.com/gitea/act_runner/client"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/ChristopherHX/github-act-runner/protocol"
+	"github.com/bufbuild/connect-go"
 	"github.com/google/uuid"
 	"github.com/nektos/act/pkg/model"
 	log "github.com/sirupsen/logrus"
@@ -130,25 +133,25 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	globalTaskMap.Store(task.Id, t)
 	defer globalTaskMap.Delete(task.Id)
 
-	lastWords := ""
-	reporter := NewReporter(ctx, cancel, t.client, task)
-	defer func() {
-		_ = reporter.Close(lastWords)
-	}()
-	reporter.RunDaemon()
+	// lastWords := ""
+	// reporter := NewReporter(ctx, cancel, t.client, task)
+	// defer func() {
+	// 	_ = reporter.Close(lastWords)
+	// }()
+	// reporter.RunDaemon()
 
-	reporter.Logf("received task %v of job %v", task.Id, task.Context.Fields["job"].GetStringValue())
+	// reporter.Logf("received task %v of job %v", task.Id, task.Context.Fields["job"].GetStringValue())
 
 	workflowsPath, err := getWorkflowsPath(t.Input.repoDirectory)
 	if err != nil {
-		lastWords = err.Error()
+		// lastWords = err.Error()
 		return err
 	}
 	t.log.Debugf("workflows path: %s", workflowsPath)
 
 	workflow, err := model.ReadWorkflow(bytes.NewReader(task.WorkflowPayload))
 	if err != nil {
-		lastWords = err.Error()
+		// lastWords = err.Error()
 		return err
 	}
 
@@ -156,13 +159,13 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	jobIDs := workflow.GetJobIDs()
 	if len(jobIDs) != 1 {
 		err := fmt.Errorf("multiple jobs found: %v", jobIDs)
-		lastWords = err.Error()
+		// lastWords = err.Error()
 		return err
 	}
 	jobID := jobIDs[0]
 	plan = model.CombineWorkflowPlanner(workflow).PlanJob(jobID)
 	job := workflow.GetJob(jobID)
-	reporter.ResetSteps(len(job.Steps))
+	// reporter.ResetSteps(len(job.Steps))
 
 	log.Infof("plan: %+v", plan.Stages[0].Runs)
 
@@ -177,10 +180,33 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	// 	maxLifetime = time.Until(deadline)
 	// }
 
-	httpServer := &http.Server{Addr: "0.0.0.0:3403", Handler: &server.ActionsServer{
+	aserver := &server.ActionsServer{
 		Client: t.client,
 		Task:   task,
-	}}
+		// Reporter: reporter,
+		LookupRecordId: make(map[string]*server.Loginfo),
+	}
+
+	httpServer := &http.Server{Addr: "0.0.0.0:3403", Handler: aserver}
+
+	defer func() {
+		t.client.UpdateLog(ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
+			TaskId: task.GetId(),
+			Index:  aserver.Line,
+			Rows: []*runnerv1.LogRow{
+				{
+					Time:    timestamppb.New(time.Now()),
+					Content: "Finished",
+				},
+			},
+			NoMore: true,
+		}))
+
+		aserver.State.Result = runnerv1.Result_RESULT_SUCCESS
+		aserver.Client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
+			State: aserver.State,
+		}))
+	}()
 
 	go func() {
 		httpServer.ListenAndServe()
@@ -204,6 +230,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 				Condition:        s.If.Value,
 				DisplayNameToken: displayName,
 				ContextName:      s.ID,
+				Id:               uuid.New().String(),
 			})
 		} else {
 			uses := s.Uses
@@ -239,6 +266,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 				Condition:        s.If.Value,
 				DisplayNameToken: displayName,
 				ContextName:      s.ID,
+				Id:               uuid.New().String(),
 			})
 		}
 	}
@@ -283,7 +311,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	src, _ := json.Marshal(jmessage)
 	jobExecCtx := ctx
 
-	worker := exec.Command("pwsh", "C:\\Users\\Christopher\\runner.server\\invokeWorkerStdIn.ps1", "C:\\Users\\Christopher\\AppData\\Local\\gharun\\runner\\2.299.1\\bin\\Runner.Worker.exe")
+	worker := exec.Command("pwsh", "/home/christopher/Downloads/actions-runner-worker.ps1", "/home/christopher/Downloads/actions-runner/bin/Runner.Worker")
 	in, err := worker.StdinPipe()
 	if err != nil {
 		return err
