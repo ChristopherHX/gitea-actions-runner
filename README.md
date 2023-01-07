@@ -1,6 +1,6 @@
 # act runner
 
-Act runner is a runner for Gitea based on [act](https://gitea.com/gitea/act).
+Act runner is a runner for Gitea based on [actions/runner](https://github.com/actions/runner) and the workflow yaml parser of [act](https://gitea.com/gitea/act).
 
 ## Prerequisites
 
