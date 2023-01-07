@@ -23,16 +23,20 @@ make build
 
 And you will be asked to input:
 
-1. Gitea instance URL, like `http://192.168.8.8:3000/`. You should use your gitea instance ROOT_URL as the instance argument
+1. github-act-runner worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker
+   actions-runner-worker.ps1 is a wrapper script to call the actions/runner via the platform specfic dotnet anonymous pipes
+2. Gitea instance URL, like `http://192.168.8.8:3000/`. You should use your gitea instance ROOT_URL as the instance argument
  and you should not use `localhost` or `127.0.0.1` as instance IP;
-2. Runner token, you can get it from `http://192.168.8.8:3000/admin/runners`;
-3. Runner name, you can just leave it blank;
-4. Runner labels, you can just leave it blank.
+3. Runner token, you can get it from `http://192.168.8.8:3000/admin/runners`;
+4. Runner name, you can just leave it blank;
+5. Runner labels, you can just leave it blank.
 
 The process looks like:
 
 ```text
 INFO Registering runner, arch=amd64, os=darwin, version=0.1.5.
+INFO Enter the github-act-runner worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker:
+pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker
 INFO Enter the Gitea instance URL (for example, https://gitea.com/):
 http://192.168.8.8:3000/
 INFO Enter the runner token:
@@ -49,7 +53,7 @@ INFO Runner registered successfully.
 You can also register with command line arguments.
 
 ```bash
-./act_runner register --instance http://192.168.8.8:3000 --token <my_runner_token> --no-interactive
+./act_runner register --instance http://192.168.8.8:3000 --token <my_runner_token> --worker pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker --no-interactive
 ```
 
 If the registry succeed, it will run immediately. Next time, you could run the runner directly.
