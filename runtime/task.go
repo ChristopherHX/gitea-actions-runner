@@ -11,6 +11,8 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +27,7 @@ import (
 	"github.com/bufbuild/connect-go"
 	"github.com/google/uuid"
 	"github.com/nektos/act/pkg/model"
+	"github.com/rhysd/actionlint"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -142,6 +145,73 @@ func ToTemplateToken(node yaml.Node) *protocol.TemplateToken {
 		}
 	}
 	return nil
+}
+
+func escapeFormatString(in string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(in, "{", "{{"), "}", "}}")
+}
+
+func rewriteSubExpression(in string, forceFormat bool) (string, bool) {
+	if !strings.Contains(in, "${{") || !strings.Contains(in, "}}") {
+		return in, false
+	}
+
+	strPattern := regexp.MustCompile("(?:''|[^'])*'")
+	pos := 0
+	exprStart := -1
+	strStart := -1
+	var results []string
+	formatOut := ""
+	for pos < len(in) {
+		if strStart > -1 {
+			matches := strPattern.FindStringIndex(in[pos:])
+			if matches == nil {
+				panic("unclosed string.")
+			}
+
+			strStart = -1
+			pos += matches[1]
+		} else if exprStart > -1 {
+			exprEnd := strings.Index(in[pos:], "}}")
+			strStart = strings.Index(in[pos:], "'")
+
+			if exprEnd > -1 && strStart > -1 {
+				if exprEnd < strStart {
+					strStart = -1
+				} else {
+					exprEnd = -1
+				}
+			}
+
+			if exprEnd > -1 {
+				formatOut += fmt.Sprintf("{%d}", len(results))
+				results = append(results, strings.TrimSpace(in[exprStart:pos+exprEnd]))
+				pos += exprEnd + 2
+				exprStart = -1
+			} else if strStart > -1 {
+				pos += strStart + 1
+			} else {
+				panic("unclosed expression.")
+			}
+		} else {
+			exprStart = strings.Index(in[pos:], "${{")
+			if exprStart != -1 {
+				formatOut += escapeFormatString(in[pos : pos+exprStart])
+				exprStart = pos + exprStart + 3
+				pos = exprStart
+			} else {
+				formatOut += escapeFormatString(in[pos:])
+				pos = len(in)
+			}
+		}
+	}
+
+	if len(results) == 1 && formatOut == "{0}" && !forceFormat {
+		return results[0], true
+	}
+
+	out := fmt.Sprintf("format('%s', %s)", strings.ReplaceAll(formatOut, "'", "''"), strings.Join(results, ", "))
+	return out, true
 }
 
 func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []string) error {
@@ -415,6 +485,46 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		condition := s.If.Value
 		if condition == "" {
 			condition = "success()"
+		} else {
+			// Remove surrounded expression syntax
+			if exprcond, ok := rewriteSubExpression(condition, false); ok {
+				condition = exprcond
+			}
+			// Try to parse the expression and inject success if no status check function has been applied
+			parser := actionlint.NewExprParser()
+			exprNode, err := parser.Parse(actionlint.NewExprLexer(condition + "}}"))
+			if err == nil {
+				hasStatusCheckFunction := false
+				actionlint.VisitExprNode(exprNode, func(node, _ actionlint.ExprNode, entering bool) {
+					if funcCallNode, ok := node.(*actionlint.FuncCallNode); entering && ok {
+						switch strings.ToLower(funcCallNode.Callee) {
+						case "success", "always", "cancelled", "failure":
+							hasStatusCheckFunction = true
+						}
+					}
+				})
+				if !hasStatusCheckFunction {
+					condition = fmt.Sprintf("success() && (%s)", condition)
+				}
+			}
+		}
+		var timeoutInMinutes *protocol.TemplateToken
+		if len(s.TimeoutMinutes) > 0 {
+			timeoutInMinutes = &protocol.TemplateToken{}
+			if timeout, err := strconv.ParseFloat(s.TimeoutMinutes, 64); err == nil {
+				timeoutInMinutes.FromRawObject(timeout)
+			} else {
+				timeoutInMinutes.FromRawObject(s.TimeoutMinutes)
+			}
+		}
+		var continueOnError *protocol.TemplateToken
+		if len(s.RawContinueOnError) > 0 {
+			continueOnError = &protocol.TemplateToken{}
+			if continueOnErr, err := strconv.ParseBool(s.RawContinueOnError); err == nil {
+				continueOnError.FromRawObject(continueOnErr)
+			} else {
+				continueOnError.FromRawObject(s.TimeoutMinutes)
+			}
 		}
 		steps = append(steps, protocol.ActionStep{
 			Type:             "action",
@@ -425,6 +535,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			ContextName:      s.ID,
 			Id:               uuid.New().String(),
 			Environment:      environment,
+			TimeoutInMinutes: timeoutInMinutes,
+			ContinueOnError:  continueOnError,
 		})
 	}
 
@@ -452,6 +564,13 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 
 	if d := ToTemplateToken(job.Env); d != nil && !job.Env.IsZero() {
 		envs = append(envs, *d)
+	}
+
+	matrix := map[string]interface{}{}
+	for _, m := range job.GetMatrixes() {
+		for k, v := range m {
+			matrix[k] = v
+		}
 	}
 
 	jmessage := &protocol.AgentJobRequestMessage{
@@ -489,7 +608,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		Variables:      map[string]protocol.VariableValue{},
 		ContextData: map[string]protocol.PipelineContextData{
 			"github":   server.ToPipelineContextData(task.Context.AsMap()),
-			"matrix":   server.ToPipelineContextData(map[string]interface{}{}),
+			"matrix":   server.ToPipelineContextData(matrix),
 			"strategy": server.ToPipelineContextData(map[string]interface{}{}),
 			"inputs":   server.ToPipelineContextData(map[string]interface{}{}),
 			"vars":     server.ToPipelineContextData(map[string]interface{}{}),
