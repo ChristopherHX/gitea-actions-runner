@@ -6,6 +6,10 @@ Act runner is a runner for Gitea based on [actions/runner](https://github.com/ac
 
 - Install powershell 7 https://github.com/powershell/powershell
 - Download and extract actions/runner https://github.com/actions/runner/releases
+- You have to create simple .runner file in the root folder of the actions/runner with the following Content
+  ```
+  {"workFolder": "_work"}
+  ```
 
 ## Quickstart
 
