@@ -110,8 +110,15 @@ func ToTemplateToken(node yaml.Node) *protocol.TemplateToken {
 			return nil
 		}
 		if err := node.Decode(&number); err == nil {
+			if number == 0 {
+				return nil
+			}
 			val = number
 		} else if err := node.Decode(&b); err == nil {
+			// container.reuse causes an error
+			if !b {
+				return nil
+			}
 			val = b
 		} else if err := node.Decode(&str); err == nil {
 			val = str
