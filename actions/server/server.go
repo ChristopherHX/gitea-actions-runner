@@ -6,23 +6,12 @@ import (
 	"net/http"
 	"strings"
 
-	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"gitea.com/gitea/act_runner/client"
 	"github.com/ChristopherHX/github-act-runner/protocol"
 )
 
-type Loginfo struct {
-	LogIndex  int64
-	LogLength int64
-}
-
 type ActionsServer struct {
-	Client         client.Client
-	Task           *runnerv1.Task
-	Line           int64
-	State          *runnerv1.TaskState
-	LookupRecordId map[string]*Loginfo
-	TraceLog       chan interface{}
+	TraceLog  chan interface{}
+	ServerUrl string
 }
 
 func ToPipelineContextDataWithError(data interface{}) (protocol.PipelineContextData, error) {
@@ -233,8 +222,8 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 			actions[fmt.Sprintf("%s@%s", ref.NameWithOwner, ref.Ref)] = protocol.ActionDownloadInfo{
 				NameWithOwner:         ref.NameWithOwner,
 				ResolvedNameWithOwner: ref.NameWithOwner,
-				TarballUrl:            fmt.Sprintf("https://github.com/%s/archive/%s.tar.gz", ref.NameWithOwner, ref.Ref),
-				ZipballUrl:            fmt.Sprintf("https://github.com/%s/archive/%s.zip", ref.NameWithOwner, ref.Ref),
+				TarballUrl:            fmt.Sprintf("%s/%s/archive/%s.tar.gz", server.ServerUrl, ref.NameWithOwner, ref.Ref),
+				ZipballUrl:            fmt.Sprintf("%s/%s/archive/%s.zip", server.ServerUrl, ref.NameWithOwner, ref.Ref),
 				Ref:                   ref.Ref,
 				ResolvedSha:           "N/A",
 			}

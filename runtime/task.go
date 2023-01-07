@@ -132,11 +132,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		t.client.Address())
 
 	aserver := &server.ActionsServer{
-		Client:         t.client,
-		Task:           task,
-		State:          &runnerv1.TaskState{},
-		LookupRecordId: make(map[string]*server.Loginfo),
-		TraceLog:       make(chan interface{}),
+		TraceLog:  make(chan interface{}),
+		ServerUrl: dataContext["gitea_default_actions_url"].GetStringValue(),
 	}
 	defer func() {
 		close(aserver.TraceLog)
@@ -296,7 +293,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		httpServer.Shutdown(context.Background())
 		t.client.UpdateLog(ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
 			TaskId: task.GetId(),
-			Index:  aserver.Line,
+			Index:  logline,
 			Rows: []*runnerv1.LogRow{
 				{
 					Time:    timestamppb.New(time.Now()),
@@ -310,7 +307,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			taskState.Result = runnerv1.Result_RESULT_FAILURE
 		}
 		taskState.StoppedAt = timestamppb.Now()
-		aserver.Client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
+		t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
 			State: taskState,
 		}))
 	}()
