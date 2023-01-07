@@ -19,6 +19,7 @@ import (
 	"gitea.com/gitea/act_runner/actions/server"
 	"gitea.com/gitea/act_runner/client"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gopkg.in/yaml.v3"
 
 	"github.com/ChristopherHX/github-act-runner/protocol"
 	"github.com/bufbuild/connect-go"
@@ -337,27 +338,50 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			}
 		} else {
 			uses := s.Uses
-			nameAndPathOrRef := strings.Split(uses, "@")
-			nameAndPath := strings.Split(nameAndPathOrRef[0], "/")
-			if nameAndPath[0] == "." {
+			if strings.HasPrefix(uses, "docker://") {
 				reference = protocol.ActionStepDefinitionReference{
-					Type:           "repository",
-					Path:           path.Join(nameAndPath[1:]...),
-					RepositoryType: "self",
+					Type:  "containerRegistry",
+					Image: strings.TrimPrefix(uses, "docker://"),
 				}
 			} else {
-				reference = protocol.ActionStepDefinitionReference{
-					Type:           "repository",
-					Name:           path.Join(nameAndPath[0:2]...),
-					Path:           path.Join(nameAndPath[2:]...),
-					Ref:            nameAndPathOrRef[1],
-					RepositoryType: "GitHub",
+				nameAndPathOrRef := strings.Split(uses, "@")
+				nameAndPath := strings.Split(nameAndPathOrRef[0], "/")
+				if nameAndPath[0] == "." {
+					reference = protocol.ActionStepDefinitionReference{
+						Type:           "repository",
+						Path:           path.Join(nameAndPath[1:]...),
+						RepositoryType: "self",
+					}
+				} else {
+					reference = protocol.ActionStepDefinitionReference{
+						Type:           "repository",
+						Name:           path.Join(nameAndPath[0:2]...),
+						Path:           path.Join(nameAndPath[2:]...),
+						Ref:            nameAndPathOrRef[1],
+						RepositoryType: "GitHub",
+					}
 				}
 			}
 			for k, v := range s.With {
 				rawIn[k] = v
 			}
 		}
+
+		var environment *protocol.TemplateToken
+		if s.Env.Kind == yaml.ScalarNode {
+			var expr string
+			_ = s.Env.Decode(&expr)
+			if expr != "" {
+				environment = &protocol.TemplateToken{}
+				environment.FromRawObject(expr)
+			}
+		} else if s.Env.Kind == yaml.MappingNode {
+			rawEnv := map[interface{}]interface{}{}
+			_ = s.Env.Decode(&rawEnv)
+			environment = &protocol.TemplateToken{}
+			environment.FromRawObject(rawEnv)
+		}
+
 		inputs := &protocol.TemplateToken{}
 		inputs.FromRawObject(rawIn)
 		condition := s.If.Value
@@ -372,6 +396,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			DisplayNameToken: displayName,
 			ContextName:      s.ID,
 			Id:               uuid.New().String(),
+			Environment:      environment,
 		})
 	}
 
