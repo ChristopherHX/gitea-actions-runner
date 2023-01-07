@@ -6,7 +6,6 @@ import (
 
 	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/config"
-	"gitea.com/gitea/act_runner/engine"
 	"gitea.com/gitea/act_runner/poller"
 	"gitea.com/gitea/act_runner/runtime"
 
@@ -29,12 +28,6 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 		}
 
 		initLogging(cfg)
-
-		// try to connect to docker daemon
-		// if failed, exit with error
-		if err := engine.Start(ctx); err != nil {
-			log.WithError(err).Fatalln("failed to connect docker daemon engine")
-		}
 
 		var g errgroup.Group
 

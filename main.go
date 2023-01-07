@@ -28,11 +28,6 @@ func withContextFunc(ctx context.Context, f func()) context.Context {
 }
 
 func main() {
-	// if true {
-	// 	http.ListenAndServe("0.0.0.0:3403", &server.ActionsServer{})
-
-	// 	return
-	// }
 	ctx := withContextFunc(context.Background(), func() {})
 	// run the command
 	cmd.Execute(ctx)
