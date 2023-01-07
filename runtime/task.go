@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -96,31 +95,7 @@ func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEn
 	return task
 }
 
-// getWorkflowsPath return the workflows directory, it will try .gitea first and then fallback to .github
-func getWorkflowsPath(dir string) (string, error) {
-	p := filepath.Join(dir, ".gitea/workflows")
-	_, err := os.Stat(p)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return "", err
-		}
-		return filepath.Join(dir, ".github/workflows"), nil
-	}
-	return p, nil
-}
-
-func getToken(task *runnerv1.Task) string {
-	token := task.Secrets["GITHUB_TOKEN"]
-	if task.Secrets["GITEA_TOKEN"] != "" {
-		token = task.Secrets["GITEA_TOKEN"]
-	}
-	if task.Context.Fields["token"].GetStringValue() != "" {
-		token = task.Context.Fields["token"].GetStringValue()
-	}
-	return token
-}
-
-func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
+func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	_, exist := globalTaskMap.Load(task.Id)
@@ -132,12 +107,6 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	// when task is done or canceled, it will be removed from the map
 	globalTaskMap.Store(task.Id, t)
 	defer globalTaskMap.Delete(task.Id)
-
-	workflowsPath, err := getWorkflowsPath(t.Input.repoDirectory)
-	if err != nil {
-		return err
-	}
-	t.log.Debugf("workflows path: %s", workflowsPath)
 
 	workflow, err := model.ReadWorkflow(bytes.NewReader(task.WorkflowPayload))
 	if err != nil {
@@ -297,9 +266,6 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 							default:
 								step.Result = runnerv1.Result_RESULT_FAILURE
 							}
-							// step.LogLength = server.Line - step.LogIndex
-						} else {
-							// step.LogIndex = server.Line
 						}
 						if step.StartedAt == nil && v.StartTime != "" {
 							t, _ := time.Parse("2006-01-02T15:04:05.0000000Z", v.StartTime)
@@ -341,7 +307,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		}))
 
 		if taskState.Result == runnerv1.Result_RESULT_UNSPECIFIED {
-			taskState.Result = runnerv1.Result_RESULT_SUCCESS
+			taskState.Result = runnerv1.Result_RESULT_FAILURE
 		}
 		taskState.StoppedAt = timestamppb.Now()
 		aserver.Client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
@@ -463,7 +429,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	src, _ := json.Marshal(jmessage)
 	jobExecCtx := ctx
 
-	worker := exec.Command("pwsh", "/home/christopher/Downloads/actions-runner-worker.ps1", "/home/christopher/Downloads/actions-runner/bin/Runner.Worker")
+	worker := exec.Command(runnerWorker[0], runnerWorker[1:]...)
 	in, err := worker.StdinPipe()
 	if err != nil {
 		return err

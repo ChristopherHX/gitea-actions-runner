@@ -36,12 +36,6 @@ func runRegister(ctx context.Context, regArgs *registerArgs, envFile string) fun
 		log.Infof("Registering runner, arch=%s, os=%s, version=%s.",
 			runtime.GOARCH, runtime.GOOS, version)
 
-		// runner always needs root permission
-		if os.Getuid() != 0 {
-			// TODO: use a better way to check root permission
-			log.Warnf("Runner in user-mode.")
-		}
-
 		if regArgs.NoInteractive {
 			if err := registerNoInteractive(envFile, regArgs); err != nil {
 				return err
@@ -68,6 +62,7 @@ func runRegister(ctx context.Context, regArgs *registerArgs, envFile string) fun
 // registerArgs represents the arguments for register command
 type registerArgs struct {
 	NoInteractive bool
+	RunnerWorker  []string
 	InstanceAddr  string
 	Token         string
 	RunnerName    string
@@ -79,6 +74,7 @@ type registerStage int8
 const (
 	StageUnknown              registerStage = -1
 	StageOverwriteLocalConfig registerStage = iota + 1
+	StageInputRunnerWorker
 	StageInputInstance
 	StageInputToken
 	StageInputRunnerName
@@ -89,14 +85,12 @@ const (
 
 var (
 	defaultLabels = []string{
-		"ubuntu-latest:docker://node:16-bullseye",
-		"ubuntu-22.04:docker://node:16-bullseye", // There's no node:16-bookworm yet
-		"ubuntu-20.04:docker://node:16-bullseye",
-		"ubuntu-18.04:docker://node:16-buster",
+		"self-hosted",
 	}
 )
 
 type registerInputs struct {
+	RunnerWorker []string
 	InstanceAddr string
 	Token        string
 	RunnerName   string
@@ -104,6 +98,9 @@ type registerInputs struct {
 }
 
 func (r *registerInputs) validate() error {
+	if len(r.RunnerWorker) == 0 {
+		return fmt.Errorf("Runner.Worker Path is Empty")
+	}
 	if r.InstanceAddr == "" {
 		return fmt.Errorf("instance address is empty")
 	}
@@ -117,13 +114,6 @@ func (r *registerInputs) validate() error {
 }
 
 func validateLabels(labels []string) error {
-	for _, label := range labels {
-		values := strings.SplitN(label, ":", 2)
-		if len(values) != 2 {
-			return fmt.Errorf("Invalid label: %s", label)
-		}
-		// TODO: validate value format, like docker://node:16-buster
-	}
 	return nil
 }
 
@@ -144,9 +134,12 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 	switch stage {
 	case StageOverwriteLocalConfig:
 		if value == "Y" || value == "y" {
-			return StageInputInstance
+			return StageInputRunnerWorker
 		}
 		return StageExit
+	case StageInputRunnerWorker:
+		r.RunnerWorker = strings.Split(value, ",")
+		return StageInputInstance
 	case StageInputInstance:
 		r.InstanceAddr = value
 		return StageInputToken
@@ -163,7 +156,7 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 		}
 
 		if validateLabels(r.CustomLabels) != nil {
-			log.Infoln("Invalid labels, please input again, leave blank to use the default labels (for example, ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster)")
+			log.Infoln("Invalid labels, please input again, leave blank to use the default labels (for example, self-hosted,ubuntu-latest)")
 			return StageInputCustomLabels
 		}
 		return StageWaitingForRegistration
@@ -174,7 +167,7 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 func registerInteractive(envFile string) error {
 	var (
 		reader = bufio.NewReader(os.Stdin)
-		stage  = StageInputInstance
+		stage  = StageInputRunnerWorker
 		inputs = new(registerInputs)
 	)
 
@@ -219,6 +212,8 @@ func printStageHelp(stage registerStage) {
 	switch stage {
 	case StageOverwriteLocalConfig:
 		log.Infoln("Runner is already registered, overwrite local config? [y/N]")
+	case StageInputRunnerWorker:
+		log.Infoln("Enter the github-act-runner worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker")
 	case StageInputInstance:
 		log.Infoln("Enter the Gitea instance URL (for example, https://gitea.com/):")
 	case StageInputToken:
@@ -227,7 +222,7 @@ func printStageHelp(stage registerStage) {
 		hostname, _ := os.Hostname()
 		log.Infof("Enter the runner name (if set empty, use hostname:%s ):\n", hostname)
 	case StageInputCustomLabels:
-		log.Infoln("Enter the runner labels, leave blank to use the default labels (comma-separated, for example, ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster):")
+		log.Infoln("Enter the runner labels, leave blank to use the default labels (comma-separated, for example, self-hosted,ubuntu-latest):")
 	case StageWaitingForRegistration:
 		log.Infoln("Waiting for registration...")
 	}
@@ -237,6 +232,7 @@ func registerNoInteractive(envFile string, regArgs *registerArgs) error {
 	_ = godotenv.Load(envFile)
 	cfg, _ := config.FromEnviron()
 	inputs := &registerInputs{
+		RunnerWorker: regArgs.RunnerWorker,
 		InstanceAddr: regArgs.InstanceAddr,
 		Token:        regArgs.Token,
 		RunnerName:   regArgs.RunnerName,
@@ -297,6 +293,7 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 	cfg.Runner.Name = inputs.RunnerName
 	cfg.Runner.Token = inputs.Token
 	cfg.Runner.Labels = inputs.CustomLabels
+	cfg.Runner.RunnerWorker = inputs.RunnerWorker
 	_, err := register.New(cli).Register(ctx, cfg.Runner)
 	return err
 }

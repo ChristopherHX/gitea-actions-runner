@@ -37,6 +37,7 @@ func Execute(ctx context.Context) {
 		RunE:  runRegister(ctx, &regArgs, gArgs.EnvFile), // must use a pointer to regArgs
 	}
 	registerCmd.Flags().BoolVar(&regArgs.NoInteractive, "no-interactive", false, "Disable interactive mode")
+	registerCmd.Flags().StringArrayVar(&regArgs.RunnerWorker, "worker", []string{}, "github-act-runner worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker")
 	registerCmd.Flags().StringVar(&regArgs.InstanceAddr, "instance", "", "Gitea instance address")
 	registerCmd.Flags().StringVar(&regArgs.Token, "token", "", "Runner token")
 	registerCmd.Flags().StringVar(&regArgs.RunnerName, "name", "", "Runner name")

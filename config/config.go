@@ -27,14 +27,15 @@ type (
 	}
 
 	Runner struct {
-		UUID     string            `ignored:"true"`
-		Name     string            `envconfig:"GITEA_RUNNER_NAME"`
-		Token    string            `ignored:"true"`
-		Capacity int               `envconfig:"GITEA_RUNNER_CAPACITY" default:"1"`
-		File     string            `envconfig:"GITEA_RUNNER_FILE" default:".runner"`
-		Environ  map[string]string `envconfig:"GITEA_RUNNER_ENVIRON"`
-		EnvFile  string            `envconfig:"GITEA_RUNNER_ENV_FILE"`
-		Labels   []string          `envconfig:"GITEA_RUNNER_LABELS"`
+		UUID         string            `ignored:"true"`
+		Name         string            `envconfig:"GITEA_RUNNER_NAME"`
+		Token        string            `ignored:"true"`
+		RunnerWorker []string          `envconfig:"GITEA_RUNNER_WORKER"`
+		Capacity     int               `envconfig:"GITEA_RUNNER_CAPACITY" default:"1"`
+		File         string            `envconfig:"GITEA_RUNNER_FILE" default:".runner"`
+		Environ      map[string]string `envconfig:"GITEA_RUNNER_ENVIRON"`
+		EnvFile      string            `envconfig:"GITEA_RUNNER_ENV_FILE"`
+		Labels       []string          `envconfig:"GITEA_RUNNER_LABELS"`
 	}
 
 	Platform struct {
@@ -64,6 +65,9 @@ func FromEnviron() (Config, error) {
 		}
 		if runner.Token != "" {
 			cfg.Runner.Token = runner.Token
+		}
+		if len(runner.RunnerWorker) != 0 {
+			cfg.Runner.RunnerWorker = runner.RunnerWorker
 		}
 		if len(runner.Labels) != 0 {
 			cfg.Runner.Labels = runner.Labels
