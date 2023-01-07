@@ -133,25 +133,14 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	globalTaskMap.Store(task.Id, t)
 	defer globalTaskMap.Delete(task.Id)
 
-	// lastWords := ""
-	// reporter := NewReporter(ctx, cancel, t.client, task)
-	// defer func() {
-	// 	_ = reporter.Close(lastWords)
-	// }()
-	// reporter.RunDaemon()
-
-	// reporter.Logf("received task %v of job %v", task.Id, task.Context.Fields["job"].GetStringValue())
-
 	workflowsPath, err := getWorkflowsPath(t.Input.repoDirectory)
 	if err != nil {
-		// lastWords = err.Error()
 		return err
 	}
 	t.log.Debugf("workflows path: %s", workflowsPath)
 
 	workflow, err := model.ReadWorkflow(bytes.NewReader(task.WorkflowPayload))
 	if err != nil {
-		// lastWords = err.Error()
 		return err
 	}
 
@@ -159,13 +148,11 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 	jobIDs := workflow.GetJobIDs()
 	if len(jobIDs) != 1 {
 		err := fmt.Errorf("multiple jobs found: %v", jobIDs)
-		// lastWords = err.Error()
 		return err
 	}
 	jobID := jobIDs[0]
 	plan = model.CombineWorkflowPlanner(workflow).PlanJob(jobID)
 	job := workflow.GetJob(jobID)
-	// reporter.ResetSteps(len(job.Steps))
 
 	log.Infof("plan: %+v", plan.Stages[0].Runs)
 
@@ -175,21 +162,172 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		dataContext["gitea_default_actions_url"].GetStringValue(),
 		t.client.Address())
 
-	// maxLifetime := 3 * time.Hour
-	// if deadline, ok := ctx.Deadline(); ok {
-	// 	maxLifetime = time.Until(deadline)
-	// }
-
 	aserver := &server.ActionsServer{
-		Client: t.client,
-		Task:   task,
-		// Reporter: reporter,
+		Client:         t.client,
+		Task:           task,
+		State:          &runnerv1.TaskState{},
 		LookupRecordId: make(map[string]*server.Loginfo),
+		TraceLog:       make(chan interface{}),
 	}
+	defer func() {
+		close(aserver.TraceLog)
+	}()
+	steps := []protocol.ActionStep{}
+	type StepMeta struct {
+		LogIndex  int64
+		LogLength int64
+		StepIndex int64
+		Record    protocol.TimelineRecord
+	}
+	stepMeta := make(map[string]*StepMeta)
+	var stepIndex int64 = -1
+	taskState := &runnerv1.TaskState{Id: task.GetId(), Steps: make([]*runnerv1.StepState, len(job.Steps)), StartedAt: timestamppb.Now()}
+	for i := 0; i < len(taskState.Steps); i++ {
+		taskState.Steps[i] = &runnerv1.StepState{
+			Id: int64(i),
+		}
+	}
+	var logline int64 = 0
+
+	go func() {
+		for {
+			obj, ok := <-aserver.TraceLog
+			if !ok {
+				break
+			}
+
+			j, _ := json.MarshalIndent(obj, "", "    ")
+			fmt.Printf("MESSAGE: %s\n", j)
+
+			if feed, ok := obj.(*protocol.TimelineRecordFeedLinesWrapper); ok {
+				loglineStart := logline
+				logline += feed.Count
+				step, ok := stepMeta[feed.StepID]
+				if ok {
+					step.LogLength += feed.Count
+				} else {
+					step = &StepMeta{}
+					stepMeta[feed.StepID] = step
+					step.StepIndex = -1
+					step.LogIndex = -1
+					step.LogLength = feed.Count
+					for i, s := range steps {
+						if s.Id == feed.StepID {
+							step.StepIndex = int64(i)
+							break
+						}
+					}
+				}
+				if step.LogIndex == -1 {
+					step.LogIndex = loglineStart
+				}
+				now := timestamppb.Now()
+				rows := []*runnerv1.LogRow{}
+				for _, row := range feed.Value {
+					rows = append(rows, &runnerv1.LogRow{
+						Time:    now,
+						Content: row,
+					})
+				}
+				res, err := t.client.UpdateLog(ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
+					TaskId: task.GetId(),
+					Index:  loglineStart,
+					Rows:   rows,
+				}))
+				if err == nil {
+					logline = res.Msg.GetAckIndex()
+				}
+				if step.StepIndex != -1 {
+					// if stepIndex < step.StepIndex && stepIndex >= 0 {
+					// 	for i := stepIndex; i < step.StepIndex; i++ {
+					// 		if step, ok := stepMeta[steps[i].Id]; ok && step.Record.Result != nil {
+					// 			cstep := taskState.Steps[i]
+					// 			switch strings.ToLower(*step.Record.Result) {
+					// 			case "succeeded":
+					// 				cstep.Result = runnerv1.Result_RESULT_SUCCESS
+					// 			case "skipped":
+					// 				cstep.Result = runnerv1.Result_RESULT_SKIPPED
+					// 			default:
+					// 				cstep.Result = runnerv1.Result_RESULT_FAILURE
+					// 			}
+					// 			if i > stepIndex {
+					// 				cstep.StartedAt = now
+					// 			}
+					// 			cstep.StoppedAt = now
+					// 		}
+					// 	}
+					// }
+					stepIndex = step.StepIndex
+					// taskState.Steps[stepIndex].StartedAt = now
+					taskState.Steps[stepIndex].LogIndex = step.LogIndex
+					taskState.Steps[stepIndex].LogLength = step.LogLength
+					t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
+						State: taskState,
+					}))
+				}
+			} else if timeline, ok := obj.(*protocol.TimelineRecordWrapper); ok {
+				for _, rec := range timeline.Value {
+					step, ok := stepMeta[rec.ID]
+					if ok {
+						step.Record = *rec
+					} else {
+						step = &StepMeta{
+							Record:    *rec,
+							LogIndex:  -1,
+							LogLength: 0,
+							StepIndex: -1,
+						}
+						stepMeta[rec.ID] = step
+						for i, s := range steps {
+							if s.Id == rec.ID {
+								step.StepIndex = int64(i)
+								break
+							}
+						}
+					}
+					if step.StepIndex >= 0 {
+						v := rec
+						step := taskState.Steps[step.StepIndex]
+						if v.Result != nil && step.Result == runnerv1.Result_RESULT_UNSPECIFIED {
+							switch strings.ToLower(*v.Result) {
+							case "succeeded":
+								step.Result = runnerv1.Result_RESULT_SUCCESS
+							case "skipped":
+								step.Result = runnerv1.Result_RESULT_SKIPPED
+							default:
+								step.Result = runnerv1.Result_RESULT_FAILURE
+							}
+							// step.LogLength = server.Line - step.LogIndex
+						} else {
+							// step.LogIndex = server.Line
+						}
+						if step.StartedAt == nil && v.StartTime != "" {
+							t, _ := time.Parse("2006-01-02T15:04:05.0000000Z", v.StartTime)
+							step.StartedAt = timestamppb.New(t)
+						}
+						if step.StoppedAt == nil && v.FinishTime != nil {
+							t, _ := time.Parse("2006-01-02T15:04:05.0000000Z", *v.FinishTime)
+							step.StoppedAt = timestamppb.New(t)
+						}
+					}
+				}
+			} else if jevent, ok := obj.(*protocol.JobEvent); ok && jevent.Result != "" {
+				switch strings.ToLower(jevent.Result) {
+				case "succeeded":
+					taskState.Result = runnerv1.Result_RESULT_SUCCESS
+				case "skipped":
+					taskState.Result = runnerv1.Result_RESULT_SKIPPED
+				default:
+					taskState.Result = runnerv1.Result_RESULT_FAILURE
+				}
+			}
+		}
+	}()
 
 	httpServer := &http.Server{Addr: "0.0.0.0:3403", Handler: aserver}
 
 	defer func() {
+		httpServer.Shutdown(context.Background())
 		t.client.UpdateLog(ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
 			TaskId: task.GetId(),
 			Index:  aserver.Line,
@@ -202,9 +340,12 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 			NoMore: true,
 		}))
 
-		aserver.State.Result = runnerv1.Result_RESULT_SUCCESS
+		if taskState.Result == runnerv1.Result_RESULT_UNSPECIFIED {
+			taskState.Result = runnerv1.Result_RESULT_SUCCESS
+		}
+		taskState.StoppedAt = timestamppb.Now()
 		aserver.Client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
-			State: aserver.State,
+			State: taskState,
 		}))
 	}()
 
@@ -212,63 +353,63 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		httpServer.ListenAndServe()
 	}()
 
-	steps := []protocol.ActionStep{}
 	for _, s := range job.Steps {
 		displayName := &protocol.TemplateToken{}
 		displayName.FromRawObject(s.Name)
+		rawIn := map[interface{}]interface{}{}
+		var reference protocol.ActionStepDefinitionReference
+
 		if s.Run != "" {
-			inputs := &protocol.TemplateToken{}
-			inputs.FromRawObject(map[interface{}]interface{}{
+			reference = protocol.ActionStepDefinitionReference{
+				Type: "script",
+			}
+			rawIn = map[interface{}]interface{}{
 				"script": s.Run,
-			})
-			steps = append(steps, protocol.ActionStep{
-				Type: "action",
-				Reference: protocol.ActionStepDefinitionReference{
-					Type: "script",
-				},
-				Inputs:           inputs,
-				Condition:        s.If.Value,
-				DisplayNameToken: displayName,
-				ContextName:      s.ID,
-				Id:               uuid.New().String(),
-			})
+			}
+			if s.Shell != "" {
+				rawIn["shell"] = s.Shell
+			}
+			if s.WorkingDirectory != "" {
+				rawIn["workingDirectory"] = s.WorkingDirectory
+			}
 		} else {
 			uses := s.Uses
 			nameAndPathOrRef := strings.Split(uses, "@")
 			nameAndPath := strings.Split(nameAndPathOrRef[0], "/")
-			var reference protocol.ActionStepDefinitionReference
 			if nameAndPath[0] == "." {
 				reference = protocol.ActionStepDefinitionReference{
 					Type:           "repository",
 					Path:           path.Join(nameAndPath[1:]...),
-					Ref:            nameAndPathOrRef[1],
 					RepositoryType: "self",
 				}
 			} else {
 				reference = protocol.ActionStepDefinitionReference{
 					Type:           "repository",
-					Name:           path.Join(nameAndPath[0:1]...),
+					Name:           path.Join(nameAndPath[0:2]...),
 					Path:           path.Join(nameAndPath[2:]...),
 					Ref:            nameAndPathOrRef[1],
 					RepositoryType: "GitHub",
 				}
 			}
-			rawIn := map[interface{}]interface{}{}
 			for k, v := range s.With {
 				rawIn[k] = v
 			}
-			inputs := &protocol.TemplateToken{}
-			inputs.FromRawObject(rawIn)
-			steps = append(steps, protocol.ActionStep{
-				Type:             "action",
-				Reference:        reference,
-				Inputs:           inputs,
-				Condition:        s.If.Value,
-				DisplayNameToken: displayName,
-				ContextName:      s.ID,
-				Id:               uuid.New().String(),
-			})
 		}
+		inputs := &protocol.TemplateToken{}
+		inputs.FromRawObject(rawIn)
+		condition := s.If.Value
+		if condition == "" {
+			condition = "success()"
+		}
+		steps = append(steps, protocol.ActionStep{
+			Type:             "action",
+			Reference:        reference,
+			Inputs:           inputs,
+			Condition:        condition,
+			DisplayNameToken: displayName,
+			ContextName:      s.ID,
+			Id:               uuid.New().String(),
+		})
 	}
 
 	jmessage := &protocol.AgentJobRequestMessage{
@@ -277,6 +418,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 			ScopeIdentifier: uuid.New().String(),
 			PlanID:          uuid.New().String(),
 			PlanType:        "free",
+			Version:         12,
 		},
 		Timeline: &protocol.TimeLineReference{
 			ID: uuid.New().String(),
@@ -304,8 +446,18 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task) error {
 		Steps:          steps,
 		Variables:      map[string]protocol.VariableValue{},
 		ContextData: map[string]protocol.PipelineContextData{
-			"github": server.ToPipelineContextData(task.Context.AsMap()),
+			"github":   server.ToPipelineContextData(task.Context.AsMap()),
+			"matrix":   server.ToPipelineContextData(map[string]interface{}{}),
+			"strategy": server.ToPipelineContextData(map[string]interface{}{}),
+			"inputs":   server.ToPipelineContextData(map[string]interface{}{}),
+			"vars":     server.ToPipelineContextData(map[string]interface{}{}),
 		},
+	}
+	jmessage.Variables["DistributedTask.NewActionMetadata"] = protocol.VariableValue{Value: "true"}
+	jmessage.Variables["DistributedTask.EnableCompositeActions"] = protocol.VariableValue{Value: "true"}
+	jmessage.Variables["DistributedTask.EnhancedAnnotations"] = protocol.VariableValue{Value: "true"}
+	for k, v := range task.Secrets {
+		jmessage.Variables[k] = protocol.VariableValue{Value: v, IsSecret: true}
 	}
 
 	src, _ := json.Marshal(jmessage)
