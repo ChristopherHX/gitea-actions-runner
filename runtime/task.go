@@ -96,6 +96,54 @@ func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEn
 	return task
 }
 
+func ToTemplateToken(node yaml.Node) *protocol.TemplateToken {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		var number float64
+		var str string
+		var b bool
+		var val interface{}
+		if node.Tag == "!!null" || node.Value == "" {
+			return nil
+		}
+		if err := node.Decode(&number); err == nil {
+			val = number
+		} else if err := node.Decode(&b); err == nil {
+			val = b
+		} else if err := node.Decode(&str); err == nil {
+			val = str
+		}
+		token := &protocol.TemplateToken{}
+		token.FromRawObject(val)
+		return token
+	case yaml.SequenceNode:
+		content := make([]protocol.TemplateToken, len(node.Content))
+		for i := 0; i < len(content); i++ {
+			content[i] = *ToTemplateToken(*node.Content[i])
+		}
+		return &protocol.TemplateToken{
+			Type: 1,
+			Seq:  &content,
+		}
+	case yaml.MappingNode:
+		cap := len(node.Content) / 2
+		content := make([]protocol.MapEntry, 0, cap)
+		for i := 0; i < cap; i++ {
+			key := ToTemplateToken(*node.Content[i*2])
+			val := ToTemplateToken(*node.Content[i*2+1])
+			// skip null values of some yaml structures of act
+			if key != nil && val != nil {
+				content = append(content, protocol.MapEntry{Key: key, Value: val})
+			}
+		}
+		return &protocol.TemplateToken{
+			Type: 2,
+			Map:  &content,
+		}
+	}
+	return nil
+}
+
 func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -380,6 +428,32 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		})
 	}
 
+	jobServiceContainers := yaml.Node{}
+	jobServiceContainers.Encode(job.Services)
+
+	envs := []protocol.TemplateToken{}
+	defs := []protocol.TemplateToken{}
+	def := yaml.Node{}
+
+	def.Encode(workflow.Defaults)
+	if d := ToTemplateToken(def); d != nil {
+		defs = append(defs, *d)
+	}
+
+	def.Encode(job.Defaults)
+	if d := ToTemplateToken(def); d != nil {
+		defs = append(defs, *d)
+	}
+
+	def.Encode(workflow.Env)
+	if d := ToTemplateToken(def); d != nil && !def.IsZero() {
+		envs = append(envs, *d)
+	}
+
+	if d := ToTemplateToken(job.Env); d != nil && !job.Env.IsZero() {
+		envs = append(envs, *d)
+	}
+
 	jmessage := &protocol.AgentJobRequestMessage{
 		MessageType: "jobRequest",
 		Plan: &protocol.TaskOrchestrationPlanReference{
@@ -420,6 +494,10 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			"inputs":   server.ToPipelineContextData(map[string]interface{}{}),
 			"vars":     server.ToPipelineContextData(map[string]interface{}{}),
 		},
+		JobContainer:         ToTemplateToken(job.RawContainer),
+		JobServiceContainers: ToTemplateToken(jobServiceContainers),
+		Defaults:             defs,
+		EnvironmentVariables: envs,
 	}
 	jmessage.Variables["DistributedTask.NewActionMetadata"] = protocol.VariableValue{Value: "true"}
 	jmessage.Variables["DistributedTask.EnableCompositeActions"] = protocol.VariableValue{Value: "true"}
