@@ -205,27 +205,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					logline = res.Msg.GetAckIndex()
 				}
 				if step.StepIndex != -1 {
-					// if stepIndex < step.StepIndex && stepIndex >= 0 {
-					// 	for i := stepIndex; i < step.StepIndex; i++ {
-					// 		if step, ok := stepMeta[steps[i].Id]; ok && step.Record.Result != nil {
-					// 			cstep := taskState.Steps[i]
-					// 			switch strings.ToLower(*step.Record.Result) {
-					// 			case "succeeded":
-					// 				cstep.Result = runnerv1.Result_RESULT_SUCCESS
-					// 			case "skipped":
-					// 				cstep.Result = runnerv1.Result_RESULT_SKIPPED
-					// 			default:
-					// 				cstep.Result = runnerv1.Result_RESULT_FAILURE
-					// 			}
-					// 			if i > stepIndex {
-					// 				cstep.StartedAt = now
-					// 			}
-					// 			cstep.StoppedAt = now
-					// 		}
-					// 	}
-					// }
 					stepIndex = step.StepIndex
-					// taskState.Steps[stepIndex].StartedAt = now
 					taskState.Steps[stepIndex].LogIndex = step.LogIndex
 					taskState.Steps[stepIndex].LogLength = step.LogLength
 					t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
