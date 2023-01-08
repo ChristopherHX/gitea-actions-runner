@@ -101,109 +101,14 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/Timeline/") {
 		recs := &protocol.TimelineRecordWrapper{}
 		jsonRequest(recs)
-
-		// steps := []*runnerv1.StepState{}
-		// state := server.State
-		// if state == nil {
-		// 	server.State = &runnerv1.TaskState{
-		// 		Id:    server.Task.GetId(),
-		// 		Steps: []*runnerv1.StepState{},
-		// 	}
-		// 	state = server.State
-		// }
-		// for i, v := range recs.Value {
-		// 	if i == 0 {
-		// 		if v.StartTime != "" {
-		// 			t, _ := time.Parse("2006-01-02T15:04:05Z", v.StartTime)
-		// 			state.StartedAt = timestamppb.New(t)
-		// 		}
-		// 		if v.FinishTime != nil {
-		// 			t, _ := time.Parse("2006-01-02T15:04:05Z", *v.FinishTime)
-		// 			state.StoppedAt = timestamppb.New(t)
-		// 		}
-		// 		continue
-		// 	}
-		// 	id := v.Order - 2
-		// 	if id < 0 {
-		// 		continue
-		// 	}
-		// 	step := &runnerv1.StepState{
-		// 		Id: int64(id),
-		// 	}
-		// 	if len(state.Steps) > int(id) {
-		// 		step = state.Steps[id]
-		// 	} else {
-		// 		state.Steps = append(state.Steps, step)
-		// 	}
-
-		// 	if v.Result != nil && step.Result == runnerv1.Result_RESULT_UNSPECIFIED {
-		// 		switch strings.ToLower(*v.Result) {
-		// 		case "succeeded":
-		// 			step.Result = runnerv1.Result_RESULT_SUCCESS
-		// 		case "skipped":
-		// 			step.Result = runnerv1.Result_RESULT_SKIPPED
-		// 		default:
-		// 			step.Result = runnerv1.Result_RESULT_FAILURE
-		// 		}
-		// 		// step.LogLength = server.Line - step.LogIndex
-		// 	} else {
-		// 		// step.LogIndex = server.Line
-		// 	}
-		// 	stepMeta, hasStep := server.LookupRecordId[v.ID]
-		// 	if hasStep && stepMeta != nil {
-		// 		step.LogIndex = stepMeta.LogIndex
-		// 		step.LogLength = stepMeta.LogLength
-		// 	}
-		// 	if v.StartTime != "" {
-		// 		t, _ := time.Parse("2006-01-02T15:04:05Z", v.StartTime)
-		// 		step.StartedAt = timestamppb.New(t)
-		// 	}
-		// 	if v.FinishTime != nil {
-		// 		t, _ := time.Parse("2006-01-02T15:04:05Z", *v.FinishTime)
-		// 		step.StoppedAt = timestamppb.New(t)
-		// 	}
-		// }
-		// server.Client.UpdateTask(req.Context(), connect.NewRequest(&runnerv1.UpdateTaskRequest{
-		// 	State: state,
-		// }))
 		jsonResponse(recs)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/FinishJob") {
 		recs := &protocol.JobEvent{}
 		jsonRequest(recs)
 		resp.WriteHeader(200)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/TimeLineWebConsoleLog/") {
-		// now := timestamppb.New(time.Now())
 		recs := &protocol.TimelineRecordFeedLinesWrapper{}
 		jsonRequest(recs)
-
-		// recordId := recs.StepID
-		// stepMeta, hasStep := server.LookupRecordId[recordId]
-		// if !hasStep || stepMeta == nil {
-		// 	stepMeta = &Loginfo{
-		// 		LogIndex: server.Line,
-		// 	}
-		// 	server.LookupRecordId[recordId] = stepMeta
-		// 	lastComp := strings.LastIndex(req.URL.Path, "/")
-		// 	recordId = req.URL.Path[lastComp+1:]
-		// 	server.LookupRecordId[recordId] = stepMeta
-		// }
-
-		// rows := []*runnerv1.LogRow{}
-		// for _, row := range recs.Value {
-		// 	rows = append(rows, &runnerv1.LogRow{
-		// 		Time:    now,
-		// 		Content: row,
-		// 	})
-		// }
-		// res, err := server.Client.UpdateLog(req.Context(), connect.NewRequest(&runnerv1.UpdateLogRequest{
-		// 	TaskId: server.Task.GetId(),
-		// 	Index:  server.Line,
-		// 	Rows:   rows,
-		// }))
-		// if err == nil {
-		// 	stepMeta.LogLength = server.Line - stepMeta.LogIndex
-		// 	server.Line = res.Msg.GetAckIndex()
-		// }
 		resp.WriteHeader(200)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/Logfiles") {
 		if strings.Count(req.URL.Path, "/") == 7 {
