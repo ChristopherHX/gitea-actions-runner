@@ -258,8 +258,9 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		t.client.Address())
 
 	aserver := &server.ActionsServer{
-		TraceLog:  make(chan interface{}),
-		ServerUrl: dataContext["gitea_default_actions_url"].GetStringValue(),
+		TraceLog:         make(chan interface{}),
+		ServerUrl:        dataContext["server_url"].GetStringValue(),
+		ActionsServerUrl: dataContext["gitea_default_actions_url"].GetStringValue(),
 	}
 	defer func() {
 		close(aserver.TraceLog)

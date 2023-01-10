@@ -10,8 +10,9 @@ import (
 )
 
 type ActionsServer struct {
-	TraceLog  chan interface{}
-	ServerUrl string
+	TraceLog         chan interface{}
+	ServerUrl        string
+	ActionsServerUrl string
 }
 
 func ToPipelineContextDataWithError(data interface{}) (protocol.PipelineContextData, error) {
@@ -124,13 +125,21 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		jsonRequest(references)
 		actions := map[string]protocol.ActionDownloadInfo{}
 		for _, ref := range references.Actions {
+			var auth *protocol.ActionDownloadAuthentication
+			if server.ActionsServerUrl != server.ServerUrl {
+				auth = &protocol.ActionDownloadAuthentication{
+					ExpiresAt: "0001-01-01T00:00:00",
+					Token:     "dummy-token",
+				}
+			}
 			actions[fmt.Sprintf("%s@%s", ref.NameWithOwner, ref.Ref)] = protocol.ActionDownloadInfo{
 				NameWithOwner:         ref.NameWithOwner,
 				ResolvedNameWithOwner: ref.NameWithOwner,
-				TarballUrl:            fmt.Sprintf("%s/%s/archive/%s.tar.gz", server.ServerUrl, ref.NameWithOwner, ref.Ref),
-				ZipballUrl:            fmt.Sprintf("%s/%s/archive/%s.zip", server.ServerUrl, ref.NameWithOwner, ref.Ref),
+				TarballUrl:            fmt.Sprintf("%s/%s/archive/%s.tar.gz", server.ActionsServerUrl, ref.NameWithOwner, ref.Ref),
+				ZipballUrl:            fmt.Sprintf("%s/%s/archive/%s.zip", server.ActionsServerUrl, ref.NameWithOwner, ref.Ref),
 				Ref:                   ref.Ref,
 				ResolvedSha:           "N/A",
+				Authentication:        auth,
 			}
 		}
 		jsonResponse(&protocol.ActionDownloadInfoCollection{
