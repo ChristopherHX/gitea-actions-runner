@@ -34,43 +34,7 @@ import (
 var globalTaskMap sync.Map
 
 type TaskInput struct {
-	repoDirectory string
-	// actor         string
-	// workdir string
-	// workflowsPath         string
-	// autodetectEvent       bool
-	// eventPath       string
-	// reuseContainers bool
-	// bindWorkdir     bool
-	// secrets         []string
 	envs map[string]string
-	// platforms       []string
-	// dryrun       bool
-	forcePull    bool
-	forceRebuild bool
-	// noOutput     bool
-	// envfile         string
-	// secretfile            string
-	insecureSecrets bool
-	// defaultBranch         string
-	privileged            bool
-	usernsMode            string
-	containerArchitecture string
-	containerDaemonSocket string
-	// noWorkflowRecurse     bool
-	useGitIgnore     bool
-	containerCapAdd  []string
-	containerCapDrop []string
-	// autoRemove         bool
-	artifactServerPath string
-	artifactServerPort string
-	jsonLogger         bool
-	// noSkipCheckout     bool
-	// remoteName            string
-
-	EnvFile string
-
-	containerNetworkMode string
 }
 
 type Task struct {
@@ -78,7 +42,6 @@ type Task struct {
 	Input   *TaskInput
 
 	client         client.Client
-	log            *log.Entry
 	platformPicker func([]string) string
 }
 
@@ -86,16 +49,13 @@ type Task struct {
 func NewTask(forgeInstance string, buildID int64, client client.Client, runnerEnvs map[string]string, picker func([]string) string) *Task {
 	task := &Task{
 		Input: &TaskInput{
-			envs:                 runnerEnvs,
-			containerNetworkMode: "bridge", // TODO should be configurable
+			envs: runnerEnvs,
 		},
 		BuildID: buildID,
 
 		client:         client,
-		log:            log.WithField("buildID", buildID),
 		platformPicker: picker,
 	}
-	task.Input.repoDirectory, _ = os.Getwd()
 	return task
 }
 
@@ -581,6 +541,17 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		}
 	}
 
+	github := task.Context.AsMap()
+	if api_url := dataContext["api_url"].GetStringValue(); api_url == "" {
+		server_url := dataContext["server_url"].GetStringValue()
+		if server_url != "" {
+			if server_url[len(server_url)-1] != '/' {
+				server_url += "/"
+			}
+			github["api_url"] = fmt.Sprintf("%sapi/v1", server_url)
+		}
+	}
+
 	jmessage := &protocol.AgentJobRequestMessage{
 		MessageType: "jobRequest",
 		Plan: &protocol.TaskOrchestrationPlanReference{
@@ -615,7 +586,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		Steps:          steps,
 		Variables:      map[string]protocol.VariableValue{},
 		ContextData: map[string]protocol.PipelineContextData{
-			"github":   server.ToPipelineContextData(task.Context.AsMap()),
+			"github":   server.ToPipelineContextData(github),
 			"matrix":   server.ToPipelineContextData(matrix),
 			"strategy": server.ToPipelineContextData(map[string]interface{}{}),
 			"inputs":   server.ToPipelineContextData(map[string]interface{}{}),
