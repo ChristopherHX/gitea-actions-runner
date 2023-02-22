@@ -4,6 +4,7 @@ Act runner is a runner for Gitea based on [actions/runner](https://github.com/ac
 
 - This runner doesn't download actions via the git http protocol, it downloads them via tar.gz and zip archives.
 - This runner doesn't support absolute actions in composite actions `https://github.com/actions/checkout@v3` will only work in workflow steps.
+- This runner doesn't support go actions, however you can create a wrapper composite action as a workaround
 - This runner does support service container
 - This runner does support https://github.com/actions/runner-container-hooks
 - This runner uses the official https://github.com/actions/runner runner to run your steps
@@ -45,7 +46,7 @@ And you will be asked to input:
    actions-runner-worker.ps1 is a wrapper script to call the actions/runner via the platform specfic dotnet anonymous pipes
 
    On windows you might need to unblock the `actions-runner-worker.ps1` script via pwsh `Unblock-File actions-runner-worker.ps1` and `Runner.Worker` needs the `.exe` suffix.
-   For example on windows use the following worker args `pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker`
+   For example on windows use the following worker args `pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker.exe`
 2. Gitea instance URL, like `http://192.168.8.8:3000/`. You should use your gitea instance ROOT_URL as the instance argument
  and you should not use `localhost` or `127.0.0.1` as instance IP;
 3. Runner token, you can get it from `http://192.168.8.8:3000/admin/runners`;
