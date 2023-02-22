@@ -2,6 +2,20 @@
 
 Act runner is a runner for Gitea based on [actions/runner](https://github.com/actions/runner) and the workflow yaml parser of [act](https://gitea.com/gitea/act).
 
+- This runner doesn't download actions via the git http protocol, it downloads them via tar.gz and zip archives.
+- This runner doesn't support absolute actions in composite actions `https://github.com/actions/checkout@v3` will only work in workflow steps.
+- This runner does support service container
+- This runner does support https://github.com/actions/runner-container-hooks
+- This runner uses the official https://github.com/actions/runner runner to run your steps
+- This runner is a protocol proxy between Gitea Actions and GitHub Actions
+
+## Known Issues
+
+- actions/runner's live logs are skipping lines, but it is not possible to upload the full log without breaking live logs after the steps are finished
+- job outputs cannot be sent back https://gitea.com/gitea/actions-proto-def/issues/4
+- Not possible to update display name of steps from runner
+  Pre and Post steps are part of setup and complete job, steps not in the job are ignored by the server
+
 ## Prerequisites
 
 - Install powershell 7 https://github.com/powershell/powershell
@@ -27,8 +41,11 @@ make build
 
 And you will be asked to input:
 
-1. github-act-runner worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker
+1. worker args for example `pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker`
    actions-runner-worker.ps1 is a wrapper script to call the actions/runner via the platform specfic dotnet anonymous pipes
+
+   On windows you might need to unblock the `actions-runner-worker.ps1` script via pwsh `Unblock-File actions-runner-worker.ps1` and `Runner.Worker` needs the `.exe` suffix.
+   For example on windows use the following worker args `pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker`
 2. Gitea instance URL, like `http://192.168.8.8:3000/`. You should use your gitea instance ROOT_URL as the instance argument
  and you should not use `localhost` or `127.0.0.1` as instance IP;
 3. Runner token, you can get it from `http://192.168.8.8:3000/admin/runners`;
@@ -39,7 +56,7 @@ The process looks like:
 
 ```text
 INFO Registering runner, arch=amd64, os=darwin, version=0.1.5.
-INFO Enter the github-act-runner worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker:
+INFO Enter the worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker:
 pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker
 INFO Enter the Gitea instance URL (for example, https://gitea.com/):
 http://192.168.8.8:3000/
@@ -60,7 +77,7 @@ You can also register with command line arguments.
 ./act_runner register --instance http://192.168.8.8:3000 --token <my_runner_token> --worker pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker --no-interactive
 ```
 
-If the registry succeed, it will run immediately. Next time, you could run the runner directly.
+If the registry succeed, you could run the runner directly.
 
 ### Run
 

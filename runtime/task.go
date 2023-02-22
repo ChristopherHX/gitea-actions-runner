@@ -412,6 +412,13 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			} else {
 				nameAndPathOrRef := strings.Split(uses, "@")
 				nameAndPath := strings.Split(nameAndPathOrRef[0], "/")
+				for _, proto := range []string{"http://", "https://"} {
+					if strings.HasPrefix(nameAndPathOrRef[0], proto) {
+						re := strings.Split(strings.TrimPrefix(nameAndPathOrRef[0], proto), "/")
+						nameAndPath = append([]string{strings.ReplaceAll(proto+re[0]+"/"+re[1], ":", "~")}, re[2:]...)
+						break
+					}
+				}
 				if nameAndPath[0] == "." {
 					reference = protocol.ActionStepDefinitionReference{
 						Type:           "repository",
@@ -421,7 +428,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 				} else {
 					reference = protocol.ActionStepDefinitionReference{
 						Type:           "repository",
-						Name:           path.Join(nameAndPath[0:2]...),
+						Name:           nameAndPath[0] + "/" + nameAndPath[1],
 						Path:           path.Join(nameAndPath[2:]...),
 						Ref:            nameAndPathOrRef[1],
 						RepositoryType: "GitHub",

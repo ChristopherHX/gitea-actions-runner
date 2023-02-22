@@ -213,7 +213,11 @@ func printStageHelp(stage registerStage) {
 	case StageOverwriteLocalConfig:
 		log.Infoln("Runner is already registered, overwrite local config? [y/N]")
 	case StageInputRunnerWorker:
-		log.Infoln("Enter the github-act-runner worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker:")
+		suffix := ""
+		if runtime.GOOS == "windows" {
+			suffix = ".exe"
+		}
+		log.Infof("Enter the worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker%s:\n", suffix)
 	case StageInputInstance:
 		log.Infoln("Enter the Gitea instance URL (for example, https://gitea.com/):")
 	case StageInputToken:

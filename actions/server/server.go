@@ -125,22 +125,46 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		jsonRequest(references)
 		actions := map[string]protocol.ActionDownloadInfo{}
 		for _, ref := range references.Actions {
-			var auth *protocol.ActionDownloadAuthentication
-			if server.ActionsServerUrl != server.ServerUrl {
-				auth = &protocol.ActionDownloadAuthentication{
+			resolved := protocol.ActionDownloadInfo{
+				NameWithOwner:         ref.NameWithOwner,
+				ResolvedNameWithOwner: ref.NameWithOwner,
+				Ref:                   ref.Ref,
+				ResolvedSha:           "N/A",
+			}
+			noAuth := false
+			absolute := false
+			for _, proto := range []string{"http~//", "https~//"} {
+				if strings.HasPrefix(ref.NameWithOwner, proto) {
+					absolute = true
+					noAuth = true
+					resolved.TarballUrl = fmt.Sprintf("%s/archive/%s.tar.gz", strings.ReplaceAll(ref.NameWithOwner, "~", ":"), ref.Ref)
+					resolved.ZipballUrl = fmt.Sprintf("%s/archive/%s.zip", strings.ReplaceAll(ref.NameWithOwner, "~", ":"), ref.Ref)
+					break
+				}
+			}
+			if !absolute {
+				var urls []string
+				if server.ServerUrl != server.ActionsServerUrl {
+					urls = []string{server.ServerUrl, server.ActionsServerUrl}
+				} else {
+					urls = []string{server.ActionsServerUrl}
+				}
+				for _, url := range urls {
+					resolved.TarballUrl = fmt.Sprintf("%s/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+					resolved.ZipballUrl = fmt.Sprintf("%s/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+					noAuth = url != server.ServerUrl
+					if resp, err := http.Head(resolved.TarballUrl); err == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+						break
+					}
+				}
+			}
+			if noAuth {
+				resolved.Authentication = &protocol.ActionDownloadAuthentication{
 					ExpiresAt: "0001-01-01T00:00:00",
 					Token:     "dummy-token",
 				}
 			}
-			actions[fmt.Sprintf("%s@%s", ref.NameWithOwner, ref.Ref)] = protocol.ActionDownloadInfo{
-				NameWithOwner:         ref.NameWithOwner,
-				ResolvedNameWithOwner: ref.NameWithOwner,
-				TarballUrl:            fmt.Sprintf("%s/%s/archive/%s.tar.gz", server.ActionsServerUrl, ref.NameWithOwner, ref.Ref),
-				ZipballUrl:            fmt.Sprintf("%s/%s/archive/%s.zip", server.ActionsServerUrl, ref.NameWithOwner, ref.Ref),
-				Ref:                   ref.Ref,
-				ResolvedSha:           "N/A",
-				Authentication:        auth,
-			}
+			actions[fmt.Sprintf("%s@%s", ref.NameWithOwner, ref.Ref)] = resolved
 		}
 		jsonResponse(&protocol.ActionDownloadInfoCollection{
 			Actions: actions,
