@@ -579,7 +579,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					Authorization: protocol.JobAuthorization{
 						Scheme: "OAuth",
 						Parameters: map[string]string{
-							"AccessToken": "Hello World",
+							"AccessToken": uuid.NewString(),
 						},
 					},
 				},
