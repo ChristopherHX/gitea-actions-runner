@@ -332,12 +332,14 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 							}
 						}
 						if step.StartedAt == nil && v.StartTime != "" {
-							t, _ := time.Parse("2006-01-02T15:04:05.0000000Z", v.StartTime)
-							step.StartedAt = timestamppb.New(t)
+							if t, err := time.Parse("2006-01-02T15:04:05.0000000Z", v.StartTime); err == nil {
+								step.StartedAt = timestamppb.New(t)
+							}
 						}
 						if step.StoppedAt == nil && v.FinishTime != nil {
-							t, _ := time.Parse("2006-01-02T15:04:05.0000000Z", *v.FinishTime)
-							step.StoppedAt = timestamppb.New(t)
+							if t, err := time.Parse("2006-01-02T15:04:05.0000000Z", *v.FinishTime); err == nil {
+								step.StoppedAt = timestamppb.New(t)
+							}
 						}
 					}
 				}
