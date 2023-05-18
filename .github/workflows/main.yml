@@ -1,6 +1,6 @@
 on: push
 jobs:
   _:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
     - run: echo Test
