@@ -4,23 +4,5 @@ jobs:
     runs-on: self-hosted
     steps:
       - run: echo Test > my-artifact.txt
-      - name: Create Release
-        id: create_release
-        uses: christopherhx/create-release@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v0.0.0-test1
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-      - name: Upload Release Asset
-        id: upload-release-asset 
-        uses: christopherhx/upload-release-asset@45e3327553433bf53384d8dad927cdbae5fb70be
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-          asset_path: ./my-artifact.txt
-          asset_name: my-artifact.txt
-          asset_content_type: text/plain
+      - run: ${{ tojson(github) }}
+        shell: cat {0}
