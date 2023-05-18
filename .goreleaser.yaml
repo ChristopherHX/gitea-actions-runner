@@ -66,7 +66,7 @@ builds:
     {{- else if eq .Arch "amd64_v1" }}amd64
     {{- else if eq .Arch "386" }}386
     {{- else }}{{ .Arch }}{{ end }}
-    {{- if .Arm }}-{{ .Arm }}{{ end }}    
+    {{- if .Arm }}-{{ .Arm }}{{ end }}
   no_unique_dist_dir: true
   hooks:
     post:
