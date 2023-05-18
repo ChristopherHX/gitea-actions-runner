@@ -1,0 +1,6 @@
+on: push
+jobs:
+  _:
+    runs-on: ubuntu-latest
+    steps:
+    - run: echo Test
