@@ -16,7 +16,7 @@ jobs:
           prerelease: false
       - name: Upload Release Asset
         id: upload-release-asset 
-        uses: christopherhx/upload-release-asset@main
+        uses: christopherhx/upload-release-asset@45e3327553433bf53384d8dad927cdbae5fb70be
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
