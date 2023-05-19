@@ -10,11 +10,12 @@ jobs:
     steps:
       - run: ${{ tojson(needs) }}
         shell: cat {0}
-    if: needs.pre.outputs.out == 'Test'
+    if: failure()
   pre:
     runs-on: ubuntu-latest
     steps:
       - run: echo "out=Test" > "$GITHUB_ENV"
         id: out
+      - run: exit 1
     outputs:
       out: ${{ env.out }}
