@@ -1,6 +1,6 @@
-# act runner
+# actions runner
 
-Act runner is a runner for Gitea based on [actions/runner](https://github.com/actions/runner) and the workflow yaml parser of [act](https://gitea.com/gitea/act).
+Actions runner is a runner for Gitea based on [actions/runner](https://github.com/actions/runner) and the workflow yaml parser of [act](https://gitea.com/gitea/act).
 
 - This runner doesn't download actions via the git http protocol, it downloads them via tar.gz and zip archives.
 - This runner doesn't support absolute actions in composite actions `https://github.com/actions/checkout@v3` will only work in workflow steps.
