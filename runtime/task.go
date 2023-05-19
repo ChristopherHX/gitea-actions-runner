@@ -644,6 +644,10 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	jmessage.Variables["DistributedTask.NewActionMetadata"] = protocol.VariableValue{Value: "true"}
 	jmessage.Variables["DistributedTask.EnableCompositeActions"] = protocol.VariableValue{Value: "true"}
 	jmessage.Variables["DistributedTask.EnhancedAnnotations"] = protocol.VariableValue{Value: "true"}
+	jmessage.Variables["DistributedTask.AddWarningToNode12Action"] = protocol.VariableValue{Value: "true"}
+	jmessage.Variables["DistributedTask.AllowRunnerContainerHooks"] = protocol.VariableValue{Value: "true"}
+	jmessage.Variables["DistributedTask.DeprecateStepOutputCommands"] = protocol.VariableValue{Value: "true"}
+	jmessage.Variables["DistributedTask.ForceGithubJavascriptActionsToNode16"] = protocol.VariableValue{Value: "true"}
 	for k, v := range task.Secrets {
 		jmessage.Variables[k] = protocol.VariableValue{Value: v, IsSecret: true}
 	}
