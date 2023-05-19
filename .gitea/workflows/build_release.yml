@@ -14,7 +14,7 @@ jobs:
   pre:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "out=Test2" > "$GITHUB_ENV"
+      - run: echo "out=Test" > "$GITHUB_ENV"
         id: out
     outputs:
       out: ${{ env.out }}
