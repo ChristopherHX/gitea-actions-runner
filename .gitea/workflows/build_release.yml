@@ -10,6 +10,7 @@ jobs:
     steps:
       - run: ${{ tojson(needs) }}
         shell: cat {0}
+    if: needs.pre.outputs.out == 'Test'
   pre:
     runs-on: ubuntu-latest
     steps:
