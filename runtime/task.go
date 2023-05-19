@@ -235,6 +235,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	stepMeta := make(map[string]*StepMeta)
 	var stepIndex int64 = -1
 	taskState := &runnerv1.TaskState{Id: task.GetId(), Steps: make([]*runnerv1.StepState, len(job.Steps)), StartedAt: timestamppb.Now()}
+	outputs := map[string]string{}
 	for i := 0; i < len(taskState.Steps); i++ {
 		taskState.Steps[i] = &runnerv1.StepState{
 			Id: int64(i),
@@ -331,26 +332,34 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 								step.Result = runnerv1.Result_RESULT_FAILURE
 							}
 						}
+						// Updated timestamp format to allow variable amount of fraction and time offset
 						if step.StartedAt == nil && v.StartTime != "" {
-							if t, err := time.Parse("2006-01-02T15:04:05.0000000Z", v.StartTime); err == nil {
+							if t, err := time.Parse("2006-01-02T15:04:05.9999999Z07:00", v.StartTime); err == nil {
 								step.StartedAt = timestamppb.New(t)
 							}
 						}
 						if step.StoppedAt == nil && v.FinishTime != nil {
-							if t, err := time.Parse("2006-01-02T15:04:05.0000000Z", *v.FinishTime); err == nil {
+							if t, err := time.Parse("2006-01-02T15:04:05.9999999Z07:00", *v.FinishTime); err == nil {
 								step.StoppedAt = timestamppb.New(t)
 							}
 						}
 					}
 				}
-			} else if jevent, ok := obj.(*protocol.JobEvent); ok && jevent.Result != "" {
-				switch strings.ToLower(jevent.Result) {
-				case "succeeded":
-					taskState.Result = runnerv1.Result_RESULT_SUCCESS
-				case "skipped":
-					taskState.Result = runnerv1.Result_RESULT_SKIPPED
-				default:
-					taskState.Result = runnerv1.Result_RESULT_FAILURE
+			} else if jevent, ok := obj.(*protocol.JobEvent); ok {
+				if jevent.Result != "" {
+					switch strings.ToLower(jevent.Result) {
+					case "succeeded":
+						taskState.Result = runnerv1.Result_RESULT_SUCCESS
+					case "skipped":
+						taskState.Result = runnerv1.Result_RESULT_SKIPPED
+					default:
+						taskState.Result = runnerv1.Result_RESULT_FAILURE
+					}
+				}
+				if jevent.Outputs != nil {
+					for k, v := range *jevent.Outputs {
+						outputs[k] = v.Value
+					}
 				}
 			}
 		}
@@ -377,7 +386,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		}
 		taskState.StoppedAt = timestamppb.Now()
 		t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
-			State: taskState,
+			State:   taskState,
+			Outputs: outputs,
 		}))
 	}()
 
@@ -560,7 +570,30 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			github["api_url"] = fmt.Sprintf("%sapi/v1", server_url)
 		}
 	}
-
+	// Convert to raw map
+	needsctx := map[string]interface{}{}
+	if rawneeds := task.GetNeeds(); rawneeds != nil {
+		for name, rawneed := range rawneeds {
+			dep := map[string]interface{}{}
+			switch rawneed.Result {
+			case runnerv1.Result_RESULT_SUCCESS:
+				dep["result"] = "success"
+			case runnerv1.Result_RESULT_FAILURE:
+				dep["result"] = "failure"
+			case runnerv1.Result_RESULT_SKIPPED:
+				dep["result"] = "skipped"
+			case runnerv1.Result_RESULT_CANCELLED:
+				dep["result"] = "cancelled"
+			}
+			dep["outputs"] = convertToRawMap(rawneed.Outputs)
+			needsctx[name] = dep
+		}
+	}
+	var jobOutputs *protocol.TemplateToken
+	if len(job.Outputs) > 0 {
+		jobOutputs = &protocol.TemplateToken{}
+		jobOutputs.FromRawObject(convertToRawTemplateTokenMap(job.Outputs))
+	}
 	jmessage := &protocol.AgentJobRequestMessage{
 		MessageType: "jobRequest",
 		Plan: &protocol.TaskOrchestrationPlanReference{
@@ -599,12 +632,14 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			"matrix":   server.ToPipelineContextData(matrix),
 			"strategy": server.ToPipelineContextData(map[string]interface{}{}),
 			"inputs":   server.ToPipelineContextData(map[string]interface{}{}),
-			"vars":     server.ToPipelineContextData(map[string]interface{}{}),
+			"needs":    server.ToPipelineContextData(needsctx),
+			"vars":     server.ToPipelineContextData(convertToRawMap(task.GetVars())),
 		},
 		JobContainer:         ToTemplateToken(job.RawContainer),
 		JobServiceContainers: ToTemplateToken(jobServiceContainers),
 		Defaults:             defs,
 		EnvironmentVariables: envs,
+		JobOutputs:           jobOutputs,
 	}
 	jmessage.Variables["DistributedTask.NewActionMetadata"] = protocol.VariableValue{Value: "true"}
 	jmessage.Variables["DistributedTask.EnableCompositeActions"] = protocol.VariableValue{Value: "true"}
@@ -660,4 +695,20 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	}
 
 	return nil
+}
+
+func convertToRawMap(data map[string]string) map[string]interface{} {
+	outputs := map[string]interface{}{}
+	for k, v := range data {
+		outputs[k] = v
+	}
+	return outputs
+}
+
+func convertToRawTemplateTokenMap(data map[string]string) map[interface{}]interface{} {
+	outputs := map[interface{}]interface{}{}
+	for k, v := range data {
+		outputs[k] = v
+	}
+	return outputs
 }
