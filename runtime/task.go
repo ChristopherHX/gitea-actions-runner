@@ -295,9 +295,13 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					stepIndex = step.StepIndex
 					taskState.Steps[stepIndex].LogIndex = step.LogIndex
 					taskState.Steps[stepIndex].LogLength = step.LogLength
-					t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
-						State: taskState,
-					}))
+				}
+				resp, err := t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
+					State: taskState,
+				}))
+				// The cancel request message is hidden in the implementation depth of the act_runner
+				if err == nil && resp.Msg.State != nil && resp.Msg.State.Result == runnerv1.Result_RESULT_CANCELLED {
+					cancel()
 				}
 			} else if timeline, ok := obj.(*protocol.TimelineRecordWrapper); ok {
 				for _, rec := range timeline.Value {
