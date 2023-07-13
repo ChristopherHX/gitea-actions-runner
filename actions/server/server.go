@@ -3,7 +3,9 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/ChristopherHX/github-act-runner/protocol"
@@ -159,16 +161,71 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 				}
 			}
 			if noAuth {
-				resolved.Authentication = &protocol.ActionDownloadAuthentication{
-					ExpiresAt: "0001-01-01T00:00:00",
-					Token:     "dummy-token",
-				}
+				// Using a dummy token has worked in 2022, but now it's broken
+				// resolved.Authentication = &protocol.ActionDownloadAuthentication{
+				// 	ExpiresAt: "0001-01-01T00:00:00",
+				// 	Token:     "dummy-token",
+				// }
+				dst := *req.URL
+				dst.Scheme = "http"
+				dst.Host = req.Host
+				dst.Path = "/_apis/v1/ActionDownload"
+				q := dst.Query()
+				q.Set("url", resolved.TarballUrl)
+				dst.RawQuery = q.Encode()
+				resolved.TarballUrl = dst.String()
+				q.Set("url", resolved.ZipballUrl)
+				dst.RawQuery = q.Encode()
+				resolved.ZipballUrl = dst.String()
 			}
 			actions[fmt.Sprintf("%s@%s", ref.NameWithOwner, ref.Ref)] = resolved
 		}
 		jsonResponse(&protocol.ActionDownloadInfoCollection{
 			Actions: actions,
 		})
+	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/ActionDownload") {
+		req, err := http.NewRequestWithContext(req.Context(), "GET", req.URL.Query().Get("url"), nil)
+		if err != nil {
+			resp.WriteHeader(404)
+			return
+		}
+		req.Header.Add("User-Agent", "github-act-runner/1.0.0")
+		req.Header.Add("Accept", "*/*")
+		rsp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			resp.WriteHeader(404)
+			return
+		}
+		defer rsp.Body.Close()
+		resp.WriteHeader(rsp.StatusCode)
+		io.Copy(resp, rsp.Body)
+	} else if strings.HasPrefix(req.URL.Path, "/_apis/pipelines/workflows/") {
+		surl, _ := url.Parse(server.ServerUrl)
+		url := *req.URL
+		url.Scheme = surl.Scheme
+		url.Host = surl.Host
+		url.Path = "/api/actions_pipeline" + url.Path
+		defer req.Body.Close()
+		myreq, err := http.NewRequestWithContext(req.Context(), req.Method, url.String(), req.Body)
+		if err != nil {
+			resp.WriteHeader(404)
+			return
+		}
+		for k, vs := range req.Header {
+			myreq.Header[k] = vs
+		}
+		rsp, err := http.DefaultClient.Do(myreq)
+		if err != nil {
+			resp.WriteHeader(404)
+			return
+		}
+		defer rsp.Body.Close()
+
+		for k, vs := range rsp.Header {
+			resp.Header()[k] = vs
+		}
+		resp.WriteHeader(rsp.StatusCode)
+		io.Copy(resp, rsp.Body)
 	} else {
 		resp.WriteHeader(404)
 	}

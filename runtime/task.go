@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -26,6 +28,8 @@ import (
 	"github.com/ChristopherHX/github-act-runner/protocol"
 	"github.com/bufbuild/connect-go"
 	"github.com/google/uuid"
+	"github.com/nektos/act/pkg/artifactcache"
+	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/exprparser"
 	"github.com/nektos/act/pkg/model"
 	"github.com/rhysd/actionlint"
@@ -444,7 +448,12 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		}
 	}()
 
-	httpServer := &http.Server{Addr: "0.0.0.0:3403", Handler: aserver}
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return err
+	}
+
+	httpServer := &http.Server{Handler: aserver}
 
 	defer func() {
 		httpServer.Shutdown(context.Background())
@@ -470,8 +479,19 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		}))
 	}()
 
+	ip := common.GetOutboundIP()
+	if ip == nil {
+		ip = net.IPv4(127, 0, 0, 1)
+	}
+	var cacheServerUrl string
+	if wd, err := os.Getwd(); err == nil {
+		if cache, err := artifactcache.StartHandler(filepath.Join(wd, "cache"), ip.String(), 0, log.New()); err == nil {
+			cacheServerUrl = cache.ExternalURL() + "/"
+			defer cache.Close()
+		}
+	}
 	go func() {
-		httpServer.ListenAndServe()
+		httpServer.Serve(listener)
 	}()
 
 	for _, s := range job.Steps {
@@ -689,12 +709,14 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			Endpoints: []protocol.JobEndpoint{
 				{
 					Name: "SYSTEMVSSCONNECTION",
-					Data: map[string]string{},
-					URL:  "http://localhost:3403/",
+					Data: map[string]string{
+						"CacheServerUrl": cacheServerUrl,
+					},
+					URL: fmt.Sprintf("http://%s:%d/", ip.String(), listener.Addr().(*net.TCPAddr).Port),
 					Authorization: protocol.JobAuthorization{
 						Scheme: "OAuth",
 						Parameters: map[string]string{
-							"AccessToken": uuid.NewString(),
+							"AccessToken": preset.Token,
 						},
 					},
 				},
