@@ -1,17 +1,17 @@
-name: test-artifacts
+name: test-cache
 
 on:
   push:
 
 jobs:
-  test-artifacts:
+  test-cache:
     runs-on: ubuntu-latest
     steps:
-    - run: mkdir -p path/to/artifact
+    - run: echo hello > world.txt
 
-    - run: echo hello > path/to/artifact/world.txt
-
-    - uses: actions/upload-artifact@v3
+    - name: Cache Primes
+      id: cache-primes
+      uses: actions/cache@v3
       with:
-        name: my-artifact
-        path: path/to/artifact/world.txt
+        path: world.txt
+        key: ${{ runner.os }}-primes
