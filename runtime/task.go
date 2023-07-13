@@ -26,6 +26,7 @@ import (
 	"github.com/ChristopherHX/github-act-runner/protocol"
 	"github.com/bufbuild/connect-go"
 	"github.com/google/uuid"
+	"github.com/nektos/act/pkg/exprparser"
 	"github.com/nektos/act/pkg/model"
 	"github.com/rhysd/actionlint"
 	log "github.com/sirupsen/logrus"
@@ -199,24 +200,86 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		return err
 	}
 
-	var plan *model.Plan
 	jobIDs := workflow.GetJobIDs()
 	if len(jobIDs) != 1 {
 		err := fmt.Errorf("multiple jobs found: %v", jobIDs)
 		return err
 	}
 	jobID := jobIDs[0]
-	plan = model.CombineWorkflowPlanner(workflow).PlanJob(jobID)
 	job := workflow.GetJob(jobID)
-
-	log.Infof("plan: %+v", plan.Stages[0].Runs)
 
 	dataContext := task.Context.Fields
 
 	log.Infof("task %v repo is %v %v %v", task.Id, dataContext["repository"].GetStringValue(),
 		dataContext["gitea_default_actions_url"].GetStringValue(),
 		t.client.Address())
+	taskContext := task.Context.Fields
+	preset := &model.GithubContext{
+		Event:           taskContext["event"].GetStructValue().AsMap(),
+		RunID:           taskContext["run_id"].GetStringValue(),
+		RunNumber:       taskContext["run_number"].GetStringValue(),
+		Actor:           taskContext["actor"].GetStringValue(),
+		Repository:      taskContext["repository"].GetStringValue(),
+		EventName:       taskContext["event_name"].GetStringValue(),
+		Sha:             taskContext["sha"].GetStringValue(),
+		Ref:             taskContext["ref"].GetStringValue(),
+		RefName:         taskContext["ref_name"].GetStringValue(),
+		RefType:         taskContext["ref_type"].GetStringValue(),
+		ServerURL:       taskContext["server_url"].GetStringValue(),
+		APIURL:          taskContext["api_url"].GetStringValue(),
+		HeadRef:         taskContext["head_ref"].GetStringValue(),
+		BaseRef:         taskContext["base_ref"].GetStringValue(),
+		Token:           taskContext["token"].GetStringValue(),
+		RepositoryOwner: taskContext["repository_owner"].GetStringValue(),
+		RetentionDays:   taskContext["retention_days"].GetStringValue(),
+	}
 
+	needs := map[string]exprparser.Needs{}
+	evalNeeds := []interface{}{}
+	for k, v := range task.GetNeeds() {
+		evalNeeds = append(evalNeeds, k)
+		result := ""
+		switch v.Result {
+		case runnerv1.Result_RESULT_SUCCESS:
+			result = "success"
+		case runnerv1.Result_RESULT_FAILURE:
+			result = "failure"
+		case runnerv1.Result_RESULT_SKIPPED:
+			result = "skipped"
+		case runnerv1.Result_RESULT_CANCELLED:
+			result = "cancelled"
+		}
+		workflow.Jobs[k] = &model.Job{
+			Name:    k,
+			Result:  result,
+			Outputs: v.GetOutputs(),
+		}
+		needs[k] = exprparser.Needs{
+			Result:  result,
+			Outputs: v.GetOutputs(),
+		}
+	}
+	intp := exprparser.NewInterpeter(&exprparser.EvaluationEnvironment{
+		Github: preset,
+		Needs:  needs,
+		Vars:   task.GetVars(),
+	}, exprparser.Config{
+		Run: &model.Run{
+			Workflow: workflow,
+			JobID:    jobID,
+		},
+		Context: "job",
+	})
+	job.RawNeeds.Encode(evalNeeds)
+	res, err := intp.Evaluate(fmt.Sprintf("(%v) && true || false", job.If.Value), exprparser.DefaultStatusCheckSuccess)
+	shouldskip := false
+	if err != nil {
+		shouldskip = true
+	} else if b, ok := res.(bool); ok {
+		shouldskip = !b
+	} else {
+		shouldskip = true
+	}
 	aserver := &server.ActionsServer{
 		TraceLog:         make(chan interface{}),
 		ServerUrl:        dataContext["server_url"].GetStringValue(),
@@ -235,6 +298,18 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	stepMeta := make(map[string]*StepMeta)
 	var stepIndex int64 = -1
 	taskState := &runnerv1.TaskState{Id: task.GetId(), Steps: make([]*runnerv1.StepState, len(job.Steps)), StartedAt: timestamppb.Now()}
+	if shouldskip {
+		taskState.Steps = []*runnerv1.StepState{}
+		taskState.StoppedAt = taskState.StartedAt
+		taskState.Result = runnerv1.Result_RESULT_SKIPPED
+		if err != nil {
+			taskState.Result = runnerv1.Result_RESULT_FAILURE
+		}
+		t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
+			State: taskState,
+		}))
+		return nil
+	}
 	outputs := map[string]string{}
 	for i := 0; i < len(taskState.Steps); i++ {
 		taskState.Steps[i] = &runnerv1.StepState{
@@ -558,7 +633,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	}
 
 	matrix := map[string]interface{}{}
-	for _, m := range job.GetMatrixes() {
+	matrixes, _ := job.GetMatrixes()
+	for _, m := range matrixes {
 		for k, v := range m {
 			matrix[k] = v
 		}
