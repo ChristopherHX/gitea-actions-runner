@@ -186,7 +186,7 @@ func rewriteSubExpression(in string, forceFormat bool) (string, bool) {
 	return out, true
 }
 
-func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []string) error {
+func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []string) (errormsg error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	_, exist := globalTaskMap.Load(task.Id)
@@ -457,13 +457,17 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 
 	defer func() {
 		httpServer.Shutdown(context.Background())
+		message := "Finished"
+		if errormsg != nil {
+			message = fmt.Sprintf("##[Error]%s", errormsg.Error())
+		}
 		t.client.UpdateLog(ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
 			TaskId: task.GetId(),
 			Index:  logline,
 			Rows: []*runnerv1.LogRow{
 				{
 					Time:    timestamppb.New(time.Now()),
-					Content: "Finished",
+					Content: message,
 				},
 			},
 			NoMore: true,
@@ -793,11 +797,29 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		case <-done:
 		}
 	}()
-	io.Copy(os.Stdout, out)
-	io.Copy(os.Stdout, er)
+	workerLog := &bytes.Buffer{}
+	workerout := io.MultiWriter(os.Stdout, workerLog)
+	io.Copy(workerout, out)
+	io.Copy(workerout, er)
 	worker.Wait()
 	if exitcode := worker.ProcessState.ExitCode(); exitcode != 0 {
-		return fmt.Errorf("failed to execute worker: %v", exitcode)
+		workerlogstr := workerLog.String()
+		loglines := []*runnerv1.LogRow{}
+		for _, line := range strings.Split(workerlogstr, "\n") {
+			loglines = append(loglines, &runnerv1.LogRow{
+				Time:    timestamppb.New(time.Now()),
+				Content: line,
+			})
+		}
+		res, err := t.client.UpdateLog(ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
+			TaskId: task.GetId(),
+			Index:  logline,
+			Rows:   loglines,
+		}))
+		if err == nil {
+			logline = res.Msg.GetAckIndex()
+		}
+		return fmt.Errorf("failed to execute worker exitcode: %v", exitcode)
 	}
 
 	return nil
