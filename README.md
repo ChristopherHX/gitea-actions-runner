@@ -44,7 +44,7 @@ make build
 And you will be asked to input:
 
 1. worker args for example `python3,actions-runner-worker.py,actions-runner/bin/Runner.Worker`, `pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker`
-   `actions-runner-worker`(`.ps1`/`.py`) are a wrapper scripts to call the actions/runner via the platform specfic dotnet anonymous pipes
+   `actions-runner-worker`(`.ps1`/`.py`) are wrapper scripts to call the actions/runner via the platform specfic dotnet anonymous pipes
 
    `actions-runner-worker.py` doesn't work on windows
 
