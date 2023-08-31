@@ -13,13 +13,14 @@ Actions runner is a runner for Gitea based on [actions/runner](https://github.co
 ## Known Issues
 
 - actions/runner's live logs are skipping lines, but it is not possible to upload the full log without breaking live logs after the steps are finished
-- job outputs cannot be sent back https://gitea.com/gitea/actions-proto-def/issues/4
+- ~~job outputs cannot be sent back https://gitea.com/gitea/actions-proto-def/issues/4~~ fixed
 - Not possible to update display name of steps from runner
   Pre and Post steps are part of setup and complete job, steps not in the job are ignored by the server
 
 ## Prerequisites
 
-- Install powershell 7 https://github.com/powershell/powershell
+- Install powershell 7 https://github.com/powershell/powershell (actions-runner-worker.ps1)
+  - For linux and macOS you can also use python3 instead (actions-runner-worker.py)
 - Download and extract actions/runner https://github.com/actions/runner/releases
 - You have to create simple .runner file in the root folder of the actions/runner with the following Content
   ```
@@ -42,8 +43,10 @@ make build
 
 And you will be asked to input:
 
-1. worker args for example `pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker`
-   actions-runner-worker.ps1 is a wrapper script to call the actions/runner via the platform specfic dotnet anonymous pipes
+1. worker args for example `python3,actions-runner-worker.py,actions-runner/bin/Runner.Worker`, `pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker`
+   `actions-runner-worker`(`.ps1`/`.py`) are a wrapper scripts to call the actions/runner via the platform specfic dotnet anonymous pipes
+
+   `actions-runner-worker.py` doesn't work on windows
 
    On windows you might need to unblock the `actions-runner-worker.ps1` script via pwsh `Unblock-File actions-runner-worker.ps1` and `Runner.Worker` needs the `.exe` suffix.
    For example on windows use the following worker args `pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker.exe`
@@ -76,6 +79,10 @@ You can also register with command line arguments.
 
 ```bash
 ./act_runner register --instance http://192.168.8.8:3000 --token <my_runner_token> --worker pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker --no-interactive
+```
+
+```bash
+./act_runner register --instance http://192.168.8.8:3000 --token <my_runner_token> --worker python3,actions-runner-worker.py,actions-runner/bin/Runner.Worker --no-interactive
 ```
 
 If the registry succeed, you could run the runner directly.
