@@ -43,7 +43,7 @@ func Execute(ctx context.Context) {
 	if runtime.GOOS == "windows" {
 		suffix = ".exe"
 	}
-	registerCmd.Flags().StringArrayVar(&regArgs.RunnerWorker, "worker", []string{}, fmt.Sprintf("worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker%s", suffix))
+	registerCmd.Flags().StringSliceVar(&regArgs.RunnerWorker, "worker", []string{}, fmt.Sprintf("worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker%s", suffix))
 	registerCmd.Flags().StringVar(&regArgs.InstanceAddr, "instance", "", "Gitea instance address")
 	registerCmd.Flags().StringVar(&regArgs.Token, "token", "", "Runner token")
 	registerCmd.Flags().StringVar(&regArgs.RunnerName, "name", "", "Runner name")
