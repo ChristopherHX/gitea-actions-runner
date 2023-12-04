@@ -642,9 +642,12 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		defs = append(defs, *d)
 	}
 
-	def.Encode(job.Defaults)
-	if d := ToTemplateToken(def); d != nil {
-		defs = append(defs, *d)
+	// Only sent defaults of job if it has at least one field set, otherwise actions/runner would always ignore the globals
+	if job.Defaults.Run.WorkingDirectory != "" || job.Defaults.Run.Shell != "" {
+		def.Encode(job.Defaults)
+		if d := ToTemplateToken(def); d != nil {
+			defs = append(defs, *d)
+		}
 	}
 
 	def.Encode(workflow.Env)
