@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/kardianos/service"
 	"github.com/spf13/cobra"
 )
 
@@ -13,6 +14,40 @@ const version = "0.1.5"
 
 type globalArgs struct {
 	EnvFile string
+}
+
+type RunRunnerSvc struct {
+	stop func()
+	wait chan error
+}
+
+// Start implements service.Interface.
+func (svc *RunRunnerSvc) Start(s service.Service) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	svc.stop = func() {
+		cancel()
+	}
+	svc.wait = make(chan error)
+	go func() {
+		defer cancel()
+		defer close(svc.wait)
+		err := runDaemon(ctx, "")(nil, nil)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		svc.wait <- err
+		s.Stop()
+	}()
+	return nil
+}
+
+// Stop implements service.Interface.
+func (svc *RunRunnerSvc) Stop(s service.Service) error {
+	svc.stop()
+	if err, ok := <-svc.wait; ok && err != nil {
+		return err
+	}
+	return nil
 }
 
 func Execute(ctx context.Context) {
@@ -62,6 +97,102 @@ func Execute(ctx context.Context) {
 
 	// hide completion command
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
+
+	var cmdSvc = &cobra.Command{
+		Use: "svc",
+	}
+	wd, _ := os.Getwd()
+	svcConfig := &service.Config{
+		Name:        "gitea-actions-runner",
+		DisplayName: "Gitea Actions Runner",
+		Description: "Runner Proxy to use actions/runner and github-act-runner with Gitea Actions.",
+		Arguments:   []string{"svc", "run", "--working-directory", wd},
+	}
+	if runtime.GOOS == "darwin" {
+		if path, ok := os.LookupEnv("PATH"); ok {
+			svcConfig.EnvVars = map[string]string{
+				"PATH": path,
+			}
+		}
+		svcConfig.Option = service.KeyValue{
+			"KeepAlive":   true,
+			"RunAtLoad":   true,
+			"UserService": os.Getuid() != 0,
+		}
+	}
+	svcRun := &cobra.Command{
+		Use: "run",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			err := os.Chdir(wd)
+			if err != nil {
+				return err
+			}
+			stdOut, err := os.OpenFile("gitea-actions-runner-log.txt", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0777)
+			if err == nil {
+				os.Stdout = stdOut
+				defer os.Stdout.Close()
+			}
+			stdErr, err := os.OpenFile("gitea-actions-runner-log-error.txt", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0777)
+			if err == nil {
+				os.Stderr = stdErr
+				defer os.Stderr.Close()
+			}
+
+			svc, err := service.New(&RunRunnerSvc{}, svcConfig)
+
+			if err != nil {
+				return err
+			}
+			return svc.Run()
+		},
+	}
+	svcRun.Flags().StringVar(&wd, "working-directory", wd, "path to the working directory of the runner config")
+	svcInstall := &cobra.Command{
+		Use: "install",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			svc, err := service.New(&RunRunnerSvc{}, svcConfig)
+
+			if err != nil {
+				return err
+			}
+			return svc.Install()
+		},
+	}
+	svcUninstall := &cobra.Command{
+		Use: "uninstall",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			svc, err := service.New(&RunRunnerSvc{}, svcConfig)
+
+			if err != nil {
+				return err
+			}
+			return svc.Uninstall()
+		},
+	}
+	svcStart := &cobra.Command{
+		Use: "start",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			svc, err := service.New(&RunRunnerSvc{}, svcConfig)
+
+			if err != nil {
+				return err
+			}
+			return svc.Start()
+		},
+	}
+	svcStop := &cobra.Command{
+		Use: "stop",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			svc, err := service.New(&RunRunnerSvc{}, svcConfig)
+
+			if err != nil {
+				return err
+			}
+			return svc.Stop()
+		},
+	}
+	cmdSvc.AddCommand(svcInstall, svcStart, svcStop, svcRun, svcUninstall)
+	rootCmd.AddCommand(cmdSvc)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
