@@ -18,6 +18,7 @@ type globalArgs struct {
 
 type RunRunnerSvc struct {
 	stop func()
+	wait chan error
 }
 
 // Start implements service.Interface.
@@ -26,12 +27,16 @@ func (svc *RunRunnerSvc) Start(s service.Service) error {
 	svc.stop = func() {
 		cancel()
 	}
+	svc.wait = make(chan error)
 	go func() {
 		defer cancel()
+		defer close(svc.wait)
 		err := runDaemon(ctx, "")(nil, nil)
 		if err != nil {
 			fmt.Println(err.Error())
 		}
+		svc.wait <- err
+		s.Stop()
 	}()
 	return nil
 }
@@ -39,6 +44,9 @@ func (svc *RunRunnerSvc) Start(s service.Service) error {
 // Stop implements service.Interface.
 func (svc *RunRunnerSvc) Stop(s service.Service) error {
 	svc.stop()
+	if err, ok := <-svc.wait; ok && err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -99,6 +107,18 @@ func Execute(ctx context.Context) {
 		DisplayName: "Gitea Actions Runner",
 		Description: "Runner Proxy to use actions/runner and github-act-runner with Gitea Actions.",
 		Arguments:   []string{"svc", "run", "--working-directory", wd},
+	}
+	if runtime.GOOS == "darwin" {
+		if path, ok := os.LookupEnv("PATH"); ok {
+			svcConfig.EnvVars = map[string]string{
+				"PATH": path,
+			}
+		}
+		svcConfig.Option = service.KeyValue{
+			"KeepAlive":   true,
+			"RunAtLoad":   true,
+			"UserService": os.Getuid() != 0,
+		}
 	}
 	svcRun := &cobra.Command{
 		Use: "run",
