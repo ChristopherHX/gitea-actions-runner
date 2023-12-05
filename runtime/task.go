@@ -324,7 +324,13 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 
 	go func() {
 		for {
-			obj, ok := <-aserver.TraceLog
+			var obj interface{}
+			var ok bool
+			select {
+			case obj, ok = <-aserver.TraceLog:
+			case <-time.After(time.Minute):
+				updateTask(ctx, t, taskState, cancel)
+			}
 			if !ok {
 				break
 			}
@@ -375,13 +381,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					taskState.Steps[stepIndex].LogIndex = step.LogIndex
 					taskState.Steps[stepIndex].LogLength = step.LogLength
 				}
-				resp, err := t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
-					State: taskState,
-				}))
 				// The cancel request message is hidden in the implementation depth of the act_runner
-				if err == nil && resp.Msg.State != nil && resp.Msg.State.Result == runnerv1.Result_RESULT_CANCELLED {
-					cancel()
-				}
+				updateTask(ctx, t, taskState, cancel)
 			} else if timeline, ok := obj.(*protocol.TimelineRecordWrapper); ok {
 				for _, rec := range timeline.Value {
 					step, ok := stepMeta[rec.ID]
@@ -833,6 +834,16 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	}
 
 	return nil
+}
+
+func updateTask(ctx context.Context, t *Task, taskState *runnerv1.TaskState, cancel context.CancelFunc) {
+	resp, err := t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
+		State: taskState,
+	}))
+
+	if err == nil && resp.Msg.State != nil && resp.Msg.State.Result != runnerv1.Result_RESULT_UNSPECIFIED {
+		cancel()
+	}
 }
 
 func convertToRawMap(data map[string]string) map[string]interface{} {
