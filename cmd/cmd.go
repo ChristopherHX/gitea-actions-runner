@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/joho/godotenv"
 	"github.com/kardianos/service"
 	"github.com/spf13/cobra"
 )
@@ -57,8 +58,7 @@ func Execute(ctx context.Context) {
 
 	// ./act_runner
 	rootCmd := &cobra.Command{
-		Use:          "act [event name to run]\nIf no event name passed, will default to \"on: push\"",
-		Short:        "Run GitHub actions locally by specifying the event name (e.g. `push`) or an action name directly.",
+		Use:          "actions_runner",
 		Args:         cobra.MaximumNArgs(1),
 		Version:      version,
 		SilenceUsage: true,
@@ -99,29 +99,13 @@ func Execute(ctx context.Context) {
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 
 	var cmdSvc = &cobra.Command{
-		Use: "svc",
+		Use:   "svc",
+		Short: "Manage the runner as a system service",
 	}
 	wd, _ := os.Getwd()
-	svcConfig := &service.Config{
-		Name:        "gitea-actions-runner",
-		DisplayName: "Gitea Actions Runner",
-		Description: "Runner Proxy to use actions/runner and github-act-runner with Gitea Actions.",
-		Arguments:   []string{"svc", "run", "--working-directory", wd},
-	}
-	if runtime.GOOS == "darwin" {
-		if path, ok := os.LookupEnv("PATH"); ok {
-			svcConfig.EnvVars = map[string]string{
-				"PATH": path,
-			}
-		}
-		svcConfig.Option = service.KeyValue{
-			"KeepAlive":   true,
-			"RunAtLoad":   true,
-			"UserService": os.Getuid() != 0,
-		}
-	}
 	svcRun := &cobra.Command{
-		Use: "run",
+		Use:   "run",
+		Short: "Used as service entrypoint",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := os.Chdir(wd)
 			if err != nil {
@@ -138,7 +122,12 @@ func Execute(ctx context.Context) {
 				defer os.Stderr.Close()
 			}
 
-			svc, err := service.New(&RunRunnerSvc{}, svcConfig)
+			err = godotenv.Overload(gArgs.EnvFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to load godotenv file '%s': %s", gArgs.EnvFile, err.Error())
+			}
+
+			svc, err := service.New(&RunRunnerSvc{}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
 				return err
@@ -148,20 +137,27 @@ func Execute(ctx context.Context) {
 	}
 	svcRun.Flags().StringVar(&wd, "working-directory", wd, "path to the working directory of the runner config")
 	svcInstall := &cobra.Command{
-		Use: "install",
+		Use:   "install",
+		Short: "Install the service may require admin privileges",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := service.New(&RunRunnerSvc{}, svcConfig)
+			svc, err := service.New(&RunRunnerSvc{}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
 				return err
 			}
-			return svc.Install()
+			err = svc.Install()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Success\nConsider adding required env variables for your jobs like HOME or PATH to your '%s' godotenv file\nSee https://pkg.go.dev/github.com/joho/godotenv for the syntax\n", gArgs.EnvFile)
+			return nil
 		},
 	}
 	svcUninstall := &cobra.Command{
-		Use: "uninstall",
+		Use:   "uninstall",
+		Short: "Uninstall the service may require admin privileges",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := service.New(&RunRunnerSvc{}, svcConfig)
+			svc, err := service.New(&RunRunnerSvc{}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
 				return err
@@ -170,9 +166,10 @@ func Execute(ctx context.Context) {
 		},
 	}
 	svcStart := &cobra.Command{
-		Use: "start",
+		Use:   "start",
+		Short: "Start the service may require admin privileges",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := service.New(&RunRunnerSvc{}, svcConfig)
+			svc, err := service.New(&RunRunnerSvc{}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
 				return err
@@ -181,9 +178,10 @@ func Execute(ctx context.Context) {
 		},
 	}
 	svcStop := &cobra.Command{
-		Use: "stop",
+		Use:   "stop",
+		Short: "Stop the service may require admin privileges",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := service.New(&RunRunnerSvc{}, svcConfig)
+			svc, err := service.New(&RunRunnerSvc{}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
 				return err
@@ -197,4 +195,21 @@ func Execute(ctx context.Context) {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+func getSvcConfig(wd string, gArgs globalArgs) *service.Config {
+	svcConfig := &service.Config{
+		Name:        "gitea-actions-runner",
+		DisplayName: "Gitea Actions Runner",
+		Description: "Runner Proxy to use actions/runner and github-act-runner with Gitea Actions.",
+		Arguments:   []string{"svc", "run", "--working-directory", wd, "--env-file", gArgs.EnvFile},
+	}
+	if runtime.GOOS == "darwin" {
+		svcConfig.Option = service.KeyValue{
+			"KeepAlive":   true,
+			"RunAtLoad":   true,
+			"UserService": os.Getuid() != 0,
+		}
+	}
+	return svcConfig
 }
