@@ -326,10 +326,15 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		for {
 			var obj interface{}
 			var ok bool
+			nextMsg := false
 			select {
 			case obj, ok = <-aserver.TraceLog:
 			case <-time.After(time.Minute):
 				updateTask(ctx, t, taskState, cancel)
+				nextMsg = true
+			}
+			if nextMsg {
+				continue
 			}
 			if !ok {
 				break
