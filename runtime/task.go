@@ -668,15 +668,21 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	}
 
 	github := task.Context.AsMap()
-	if api_url := dataContext["api_url"].GetStringValue(); api_url == "" {
-		server_url := dataContext["server_url"].GetStringValue()
-		if server_url != "" {
-			if server_url[len(server_url)-1] != '/' {
-				server_url += "/"
-			}
-			github["api_url"] = fmt.Sprintf("%sapi/v1", server_url)
-		}
+	// Gitea Actions Bug github.server_url has a / as suffix
+	server_url := dataContext["server_url"].GetStringValue()
+	for server_url != "" && strings.HasSuffix(server_url, "/") {
+		server_url = server_url[:len(server_url)-1]
+		github["server_url"] = server_url
 	}
+	api_url := dataContext["api_url"].GetStringValue()
+	if api_url == "" {
+		github["api_url"] = fmt.Sprintf("%s/api/v1", server_url)
+	}
+	// Gitea Actions Bug github.job is a number
+	// use number as id, extension
+	github["job_id"] = github["job"]
+	// correct the name
+	github["job"] = jobID
 	// Convert to raw map
 	needsctx := map[string]interface{}{}
 	if rawneeds := task.GetNeeds(); rawneeds != nil {
@@ -730,8 +736,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			},
 		},
 		JobID:          uuid.New().String(),
-		JobDisplayName: "test ()",
-		JobName:        "test",
+		JobDisplayName: jobID,
+		JobName:        jobID,
 		RequestID:      475,
 		LockedUntil:    "0001-01-01T00:00:00",
 		Steps:          steps,
@@ -757,6 +763,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	jmessage.Variables["DistributedTask.AllowRunnerContainerHooks"] = protocol.VariableValue{Value: "true"}
 	jmessage.Variables["DistributedTask.DeprecateStepOutputCommands"] = protocol.VariableValue{Value: "true"}
 	jmessage.Variables["DistributedTask.ForceGithubJavascriptActionsToNode16"] = protocol.VariableValue{Value: "true"}
+	jmessage.Variables["system.github.job"] = protocol.VariableValue{Value: job.Name}
 	for k, v := range task.Secrets {
 		jmessage.Variables[k] = protocol.VariableValue{Value: v, IsSecret: true}
 	}
