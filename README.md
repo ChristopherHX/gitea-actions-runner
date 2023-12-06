@@ -37,7 +37,8 @@ make build
 
 ### Register
 
-```bash
+```bash![C4_Elements](https://github.com/ChristopherHX/gitea-actions-runner/assets/44845461/76b0ded2-0f18-472a-862d-6550b5937252)
+
 ./act_runner register
 ```
 
@@ -92,3 +93,9 @@ If the registry succeed, you could run the runner directly.
 ```bash
 ./act_runner daemon
 ```
+
+### System Overview
+
+A lot of my projects can communicate through various indirections.
+
+![C4_Elements](https://github.com/ChristopherHX/gitea-actions-runner/assets/44845461/78ff5218-570c-4506-81a5-a1baa26f8016)
