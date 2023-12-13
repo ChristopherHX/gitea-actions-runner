@@ -2,6 +2,10 @@ on:
   push:
     branches:
     - main
+  workflow_dispatch:
+    inputs:
+      gitea-runner-tag:
+        type: string
   workflow_call:
     inputs:
       gitea-runner-tag:
@@ -42,4 +46,6 @@ jobs:
         context: .
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: ghcr.io/${{env.LOWNER}}/gitea-actions-runner:${{ inputs.gitea-runner-tag || 'nightly' }},ghcr.io/${{env.LOWNER}}/gitea-actions-runner:${{ inputs.gitea-runner-tag && 'latest' || 'nightly' }}
+        build-args: |
+          GITEA_ACTIONS_RUNNER_VERSION=${{ inputs.gitea-runner-tag || 'v0.6.5' }}
+        tags: ghcr.io/${{env.LOWNER}}/gitea-actions-runner:${{ inputs.gitea-runner-tag || 'v0.6.5' }},ghcr.io/${{env.LOWNER}}/gitea-actions-runner:${{ inputs.gitea-runner-tag && 'latest' || 'v0.6.5' }}
