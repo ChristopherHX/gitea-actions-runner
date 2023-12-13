@@ -2,8 +2,8 @@
 # Source: https://github.com/dotnet/dotnet-docker
 FROM mcr.microsoft.com/dotnet/runtime-deps:6.0-jammy as build
 
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
+ARG TARGETOS
+ARG TARGETARCH
 ARG RUNNER_VERSION=2.311.0
 ARG RUNNER_CONTAINER_HOOKS_VERSION=0.5.0
 ARG DOCKER_VERSION=24.0.6
@@ -39,13 +39,14 @@ RUN export RUNNER_ARCH=${TARGETARCH} \
 
 FROM mcr.microsoft.com/dotnet/runtime-deps:6.0-jammy
 
+ARG GITEA_ACTIONS_RUNNER_VERSION=0.0.6
+ARG TARGETARCH
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV RUNNER_MANUALLY_TRAP_SIG=1
 ENV ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
 ENV ImageOS=ubuntu22
 ENV ACTIONS_RUNNER_CONTAINER_HOOKS=/home/runner/docker-hooks/index.js
-ARG GITEA_ACTIONS_RUNNER_VERSION=0.0.6
-ARG TARGETARCH=amd64
 
 RUN apt-get update -y \
     && apt-get install -y --no-install-recommends \
