@@ -45,6 +45,7 @@ ENV ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
 ENV ImageOS=ubuntu22
 ENV ACTIONS_RUNNER_CONTAINER_HOOKS=/home/runner/docker-hooks/index.js
 ARG GITEA_ACTIONS_RUNNER_VERSION=0.6.5
+ARG TARGETARCH=amd64
 
 RUN apt-get update -y \
     && apt-get install -y --no-install-recommends \
@@ -81,7 +82,6 @@ RUN chown runner:docker /runner && mkdir -p /home/runner/_work && chown -R runne
 COPY actions-runner-worker.py /runner
 COPY start.sh /runner
 
-RUN curl -LJO "https://github.com/ChristopherHX/gitea-actions-runner/releases/download/v${GITEA_ACTIONS_RUNNER_VERSION#v}/gitea-actions-runner-${GITEA_ACTIONS_RUNNER_VERSION#v}-linux-$RUNNER_ARCH" --output gitea-actions-runner
-RUN chmod +x gitea-actions-runner
+RUN curl -LJO "https://github.com/ChristopherHX/gitea-actions-runner/releases/download/v${GITEA_ACTIONS_RUNNER_VERSION#v}/gitea-actions-runner-${GITEA_ACTIONS_RUNNER_VERSION#v}-linux-${TARGETARCH}" && mv "gitea-actions-runner-${GITEA_ACTIONS_RUNNER_VERSION#v}-linux-${TARGETARCH}" gitea-actions-runner && chmod +x gitea-actions-runner
 
 CMD ["bash", "/runner/start.sh"]
