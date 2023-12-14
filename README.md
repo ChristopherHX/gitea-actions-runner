@@ -24,7 +24,7 @@ Actions runner is a runner for Gitea based on [actions/runner](https://github.co
 - Download and extract actions/runner https://github.com/actions/runner/releases
 - You have to create simple .runner file in the root folder of the actions/runner with the following Content
   ```
-  {"workFolder": "_work"}
+  {"isHostedServer": false, "agentName": "my-runner", "workFolder": "_work"}
   ```
 
 ## Quickstart
