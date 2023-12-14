@@ -35,7 +35,6 @@ jobs:
       #     script: core.setOutput("", ${{ tojson(github.ref)}}.substring("refs/tags/v".length))
 
   container:
-    needs: goreleaser
     if: startsWith(github.ref, 'refs/tags/')
     uses: ./.github/workflows/build_container.yml
     permissions:

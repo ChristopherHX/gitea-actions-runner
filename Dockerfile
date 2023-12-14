@@ -37,10 +37,16 @@ RUN export RUNNER_ARCH=${TARGETARCH} \
         "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-${TARGETARCH}" \
     && chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 
-FROM mcr.microsoft.com/dotnet/runtime-deps:6.0-jammy
+FROM golang:1.21-alpine3.18 as builder
+# Do not remove `git` here, it is required for getting runner version when executing `make build`
+RUN apk add --no-cache make git
 
-ARG GITEA_ACTIONS_RUNNER_VERSION=0.0.6
-ARG TARGETARCH
+COPY . /opt/src/act_runner
+WORKDIR /opt/src/act_runner
+
+RUN make clean && make build
+
+FROM mcr.microsoft.com/dotnet/runtime-deps:6.0-jammy
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV RUNNER_MANUALLY_TRAP_SIG=1
@@ -53,6 +59,7 @@ RUN apt-get update -y \
     sudo \
     jq \
     curl \
+    git \
     lsb-release \
     && rm -rf /var/lib/apt/lists/*
 
@@ -80,9 +87,9 @@ USER runner
 WORKDIR /runner
 RUN chown runner:docker /runner && mkdir -p /home/runner/_work && chown -R runner:docker /home/runner/_work
 
+COPY --from=builder /opt/src/act_runner/gitea-actions-runner /runner/gitea-actions-runner
+
 COPY actions-runner-worker.py /runner
 COPY start.sh /runner
-
-RUN curl -LJO "https://github.com/ChristopherHX/gitea-actions-runner/releases/download/v${GITEA_ACTIONS_RUNNER_VERSION#v}/gitea-actions-runner-${GITEA_ACTIONS_RUNNER_VERSION#v}-linux-${TARGETARCH}" && mv "gitea-actions-runner-${GITEA_ACTIONS_RUNNER_VERSION#v}-linux-${TARGETARCH}" gitea-actions-runner && chmod +x gitea-actions-runner
 
 CMD ["bash", "/runner/start.sh"]
