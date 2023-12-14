@@ -51,7 +51,7 @@ if [[ ! -s "$RUNNER_STATE_FILE" ]]; then
       jq --null-input \
          --arg agentName "${GITEA_RUNNER_NAME:-`hostname`}" \
          --arg workFolder "/home/runner/_work" \
-        '{ "agentName": $agentName, "workFolder": $workFolder }' > /data/.actions_runner
+        '{ "isHostedServer": false, "agentName": $agentName, "workFolder": $workFolder }' > /data/.actions_runner
     else
       echo "Waiting to retry ..."
       try=$(($try + 1))
