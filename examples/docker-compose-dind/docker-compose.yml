@@ -1,4 +1,4 @@
-# docker-compose.yml 
+# docker-compose.yml
 networks:
   runner:
     external: false
@@ -9,39 +9,33 @@ volumes:
     driver: local
   gitea-runner-data:
     driver: local
-  docker-certs:
+  socket:
     driver: local
 services:
   runner:
-    image: ghcr.io/christopherhx/gitea-actions-runner:latest
+    image: ghcr.io/christopherhx/gitea-actions-runner:ubuntu-focal
     environment:
-      - GITEA_INSTANCE_URL=https://gitea.com                            # Your Gitea Instance to register to
-      - GITEA_RUNNER_REGISTRATION_TOKEN=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX # The Gitea registration token
-      - GITEA_RUNNER_LABELS=self-hosted                                 # The labels of your runner (comma separated)
-      - DOCKER_TLS_CERTDIR=/certs                                       # DIND
-      - DOCKER_CERT_PATH=/certs/client                                  # DIND
-      - DOCKER_TLS_VERIFY=1                                             # DIND
-      - DOCKER_HOST=tcp://docker:2376                                   # DIND
+      - GITEA_INSTANCE_URL=https://gitea.com/                            # Your Gitea Instance to register to
+      - GITEA_RUNNER_REGISTRATION_TOKEN=XXXXXXXXXXXXXXXXXXXXXXX          # The Gitea registration token
+      - GITEA_RUNNER_LABELS=self-hosted                                  # The labels of your runner (comma separated)
     restart: always
+    user: root
     networks:
       - runner
     volumes:
       - gitea-runner-data:/data                 # Persist runner registration across updates
       - runner:/home/runner/_work               # DIND
       - runner-externals:/home/runner/externals # DIND
-      - docker-certs:/certs                     # DIND
+      - socket:/var/run
     depends_on:
       - docker
   docker:
-    image: docker:dind-rootless
+    image: docker:dind
     restart: always
     privileged: true
-    environment:
-      - DOCKER_TLS_CERTDIR=/certs
     networks:
       - runner
     volumes:
       - runner:/home/runner/_work
       - runner-externals:/home/runner/externals
-      - docker-certs:/certs
-      - ./var-lib-docker:/var/lib/docker
+      - socket:/var/run
