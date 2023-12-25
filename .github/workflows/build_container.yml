@@ -14,9 +14,10 @@ on:
 jobs:
   docker:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    strategy:
+      matrix:
+        release: [jammy, focal, latest]
+      fail-fast: false
     steps:
     - uses: actions/checkout@v3
     -
@@ -39,6 +40,18 @@ jobs:
       shell: bash
       env:
         OWNER: ${{github.repository_owner}}
+    - 
+      name: Replace Docker Image in Dockerfile
+      run: |
+        if [ "${{ matrix.release }}" == "jammy" ]; then
+          version="22.04"
+        elif [ "${{ matrix.release }}" == "focal" ]; then
+          version="20.04"
+        else
+          version="latest"
+        fi
+        sed -i "s/FROM catthehacker\/ubuntu:act-latest.*/FROM catthehacker\/ubuntu:act-${version}-20231008/" Dockerfile
+        sed -i "s/ENV GITEA_RUNNER_LABELS=ubuntu-latest/ENV GITEA_RUNNER_LABELS=ubuntu-${version}/" Dockerfile
     -
       name: Build and push
       uses: docker/build-push-action@v3
@@ -46,4 +59,4 @@ jobs:
         context: .
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: ghcr.io/${{env.LOWNER}}/gitea-actions-runner:${{ inputs.gitea-runner-tag || 'nightly' }},ghcr.io/${{env.LOWNER}}/gitea-actions-runner:${{ inputs.gitea-runner-tag && 'latest' || 'nightly' }}
+        tags: ghcr.io/${{env.LOWNER}}/gitea-actions-runner:ubuntu-${{ matrix.release }}

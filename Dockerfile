@@ -26,17 +26,6 @@ RUN curl -f -L -o runner-container-hooks.zip https://github.com/actions/runner-c
     && unzip ./runner-container-hooks.zip -d ./k8s \
     && rm runner-container-hooks.zip
 
-RUN export RUNNER_ARCH=${TARGETARCH} \
-    && if [ "$RUNNER_ARCH" = "amd64" ]; then export DOCKER_ARCH=x86_64 ; fi \
-    && if [ "$RUNNER_ARCH" = "arm64" ]; then export DOCKER_ARCH=aarch64 ; fi \
-    && curl -fLo docker.tgz https://download.docker.com/${TARGETOS}/static/stable/${DOCKER_ARCH}/docker-${DOCKER_VERSION}.tgz \
-    && tar zxvf docker.tgz \
-    && rm -rf docker.tgz \
-    && mkdir -p /usr/local/lib/docker/cli-plugins \
-    && curl -fLo /usr/local/lib/docker/cli-plugins/docker-buildx \
-        "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-${TARGETARCH}" \
-    && chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
-
 FROM golang:1.21-alpine3.18 as builder
 # Do not remove `git` here, it is required for getting runner version when executing `make build`
 RUN apk add --no-cache make git
@@ -46,29 +35,19 @@ WORKDIR /opt/src/act_runner
 
 RUN make clean && make build
 
-FROM mcr.microsoft.com/dotnet/runtime-deps:6.0-jammy
+FROM catthehacker/ubuntu:act-latest-20231008
 
-ENV DEBIAN_FRONTEND=noninteractive
+ENV GITEA_RUNNER_LABELS=ubuntu-latest
 ENV RUNNER_MANUALLY_TRAP_SIG=1
 ENV ACTIONS_RUNNER_PRINT_LOG_TO_STDOUT=1
-ENV ImageOS=ubuntu22
 ENV ACTIONS_RUNNER_CONTAINER_HOOKS=/home/runner/docker-hooks/index.js
 
-RUN apt-get update -y \
-    && apt-get install -y --no-install-recommends \
-    sudo \
-    jq \
-    curl \
-    git \
-    lsb-release \
-    && rm -rf /var/lib/apt/lists/*
-
 RUN adduser --disabled-password --gecos "" --uid 1000 runner \
-    && groupadd docker --gid 123 \
     && usermod -aG sudo runner \
     && usermod -aG docker runner \
     && echo "%sudo   ALL=(ALL:ALL) NOPASSWD:ALL" > /etc/sudoers \
-    && echo "Defaults env_keep += \"DEBIAN_FRONTEND\"" >> /etc/sudoers
+    && echo "Defaults env_keep += \"DEBIAN_FRONTEND\"" >> /etc/sudoers \
+    && echo "root ALL=(ALL) ALL" >> /etc/sudoers
 
 WORKDIR /home/runner
 
@@ -76,9 +55,6 @@ VOLUME /home/runner/externals
 VOLUME /home/runner/_work
 
 COPY --chown=runner:docker --from=build /actions-runner .
-COPY --from=build /usr/local/lib/docker/cli-plugins/docker-buildx /usr/local/lib/docker/cli-plugins/docker-buildx
-
-RUN install -o root -g root -m 755 docker/* /usr/bin/ && rm -rf docker
 
 RUN mkdir -p /runner && chown runner:docker -R /runner && ln -s /data/.actions_runner .runner
 
