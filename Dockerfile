@@ -41,8 +41,8 @@ FROM golang:1.21-alpine3.18 as builder
 # Do not remove `git` here, it is required for getting runner version when executing `make build`
 RUN apk add --no-cache make git
 
-COPY . /opt/src/act_runner
-WORKDIR /opt/src/act_runner
+COPY . /opt/src/gitea-actions-runner
+WORKDIR /opt/src/gitea-actions-runner
 
 RUN make clean && make build
 
@@ -87,7 +87,7 @@ USER runner
 WORKDIR /runner
 RUN chown runner:docker /runner && mkdir -p /home/runner/_work && chown -R runner:docker /home/runner/_work
 
-COPY --from=builder /opt/src/act_runner/gitea-actions-runner /runner/gitea-actions-runner
+COPY --from=builder /opt/src/gitea-actions-runner/gitea-actions-runner /runner/gitea-actions-runner
 
 COPY actions-runner-worker.py /runner
 COPY start.sh /runner

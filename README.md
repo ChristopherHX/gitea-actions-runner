@@ -39,7 +39,7 @@ make build
 
 ```bash![C4_Elements](https://github.com/ChristopherHX/gitea-actions-runner/assets/44845461/76b0ded2-0f18-472a-862d-6550b5937252)
 
-./act_runner register
+./gitea-actions-runner register
 ```
 
 And you will be asked to input:
@@ -79,11 +79,11 @@ INFO Runner registered successfully.
 You can also register with command line arguments.
 
 ```bash
-./act_runner register --instance http://192.168.8.8:3000 --token <my_runner_token> --worker pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker --no-interactive
+./gitea-actions-runner register --instance http://192.168.8.8:3000 --token <my_runner_token> --worker pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker --no-interactive
 ```
 
 ```bash
-./act_runner register --instance http://192.168.8.8:3000 --token <my_runner_token> --worker python3,actions-runner-worker.py,actions-runner/bin/Runner.Worker --no-interactive
+./gitea-actions-runner register --instance http://192.168.8.8:3000 --token <my_runner_token> --worker python3,actions-runner-worker.py,actions-runner/bin/Runner.Worker --no-interactive
 ```
 
 If the registry succeed, you could run the runner directly.
@@ -91,8 +91,12 @@ If the registry succeed, you could run the runner directly.
 ### Run
 
 ```bash
-./act_runner daemon
+./gitea-actions-runner daemon
 ```
+
+### Hosted on both GitHub and Gitea
+- https://gitea.com/ChristopherHX/actions_runner
+- https://github.com/ChristopherHX/gitea-actions-runner
 
 ### System Overview
 

@@ -713,6 +713,10 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		jobOutputs = &protocol.TemplateToken{}
 		jobOutputs.FromRawObject(convertToRawTemplateTokenMap(job.Outputs))
 	}
+	token := taskContext["gitea_runtime_token"].GetStringValue()
+	if token == "" {
+		token = preset.Token
+	}
 	jmessage := &protocol.AgentJobRequestMessage{
 		MessageType: "jobRequest",
 		Plan: &protocol.TaskOrchestrationPlanReference{
@@ -729,13 +733,14 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 				{
 					Name: "SYSTEMVSSCONNECTION",
 					Data: map[string]string{
-						"CacheServerUrl": cacheServerUrl,
+						"CacheServerUrl":    cacheServerUrl,
+						"ResultsServiceUrl": server_url,
 					},
 					URL: fmt.Sprintf("http://%s:%d/", ip.String(), listener.Addr().(*net.TCPAddr).Port),
 					Authorization: protocol.JobAuthorization{
 						Scheme: "OAuth",
 						Parameters: map[string]string{
-							"AccessToken": preset.Token,
+							"AccessToken": token,
 						},
 					},
 				},
