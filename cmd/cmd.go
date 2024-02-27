@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "0.1.5"
+var version = "0.1.5"
 
 type globalArgs struct {
 	EnvFile string

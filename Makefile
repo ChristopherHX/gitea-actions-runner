@@ -44,7 +44,7 @@ STORED_VERSION_FILE := VERSION
 
 ifneq ($(DRONE_TAG),)
 	VERSION ?= $(subst v,,$(DRONE_TAG))
-	RELASE_VERSION ?= $(VERSION)
+	RELEASE_VERSION ?= $(VERSION)
 else
 	ifneq ($(DRONE_BRANCH),)
 		VERSION ?= $(subst release/v,,$(DRONE_BRANCH))
@@ -54,14 +54,14 @@ else
 
 	STORED_VERSION=$(shell cat $(STORED_VERSION_FILE) 2>/dev/null)
 	ifneq ($(STORED_VERSION),)
-		RELASE_VERSION ?= $(STORED_VERSION)
+		RELEASE_VERSION ?= $(STORED_VERSION)
 	else
-		RELASE_VERSION ?= $(shell git describe --tags --always | sed 's/-/+/' | sed 's/^v//')
+		RELEASE_VERSION ?= $(shell git describe --tags --always | sed 's/-/+/' | sed 's/^v//')
 	endif
 endif
 
 TAGS ?=
-LDFLAGS ?= -X 'main.Version=$(VERSION)'
+LDFLAGS ?= -X 'gitea.com/gitea/act_runner/cmd.version=$(RELEASE_VERSION)'
 
 all: build
 
