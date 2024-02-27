@@ -3,7 +3,7 @@ module gitea.com/gitea/act_runner
 go 1.18
 
 require (
-	code.gitea.io/actions-proto-go v0.2.1
+	code.gitea.io/actions-proto-go v0.3.1
 	github.com/ChristopherHX/github-act-runner v0.4.2
 	github.com/bufbuild/connect-go v1.3.1
 	github.com/google/uuid v1.3.0

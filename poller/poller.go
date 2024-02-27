@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
@@ -35,6 +36,7 @@ type Poller struct {
 	metric       *metric
 	ready        chan struct{}
 	workerNum    int
+	tasksVersion atomic.Int64 // tasksVersion used to store the version of the last task fetched from the Gitea.
 }
 
 func (p *Poller) schedule() {
@@ -103,9 +105,11 @@ func (p *Poller) pollTask(ctx context.Context) (*runnerv1.Task, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	// request a new build stage for execution from the central
-	// build server.
-	resp, err := p.Client.FetchTask(reqCtx, connect.NewRequest(&runnerv1.FetchTaskRequest{}))
+	// Load the version value that was in the cache when the request was sent.
+	v := p.tasksVersion.Load()
+	resp, err := p.Client.FetchTask(reqCtx, connect.NewRequest(&runnerv1.FetchTaskRequest{
+		TasksVersion: v,
+	}))
 	if err == context.Canceled || err == context.DeadlineExceeded {
 		l.WithError(err).Trace("poller: no stage returned")
 		return nil, nil
@@ -123,9 +127,20 @@ func (p *Poller) pollTask(ctx context.Context) (*runnerv1.Task, error) {
 
 	// exit if a nil or empty stage is returned from the system
 	// and allow the runner to retry.
+	if resp == nil || resp.Msg == nil {
+		return nil, nil
+	}
+
+	if resp.Msg.TasksVersion > v {
+		p.tasksVersion.CompareAndSwap(v, resp.Msg.TasksVersion)
+	}
+
 	if resp.Msg.Task == nil || resp.Msg.Task.Id == 0 {
 		return nil, nil
 	}
+
+	// got a task, set `tasksVersion` to zero to force query db in next request.
+	p.tasksVersion.CompareAndSwap(resp.Msg.TasksVersion, 0)
 
 	return resp.Msg.Task, nil
 }
