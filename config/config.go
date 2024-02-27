@@ -60,20 +60,23 @@ func FromEnviron() (Config, error) {
 		if err := json.Unmarshal(byteValue, &runner); err != nil {
 			return cfg, err
 		}
-		if runner.UUID != "" {
+		if cfg.Runner.UUID == "" {
 			cfg.Runner.UUID = runner.UUID
 		}
-		if runner.Token != "" {
+		if cfg.Runner.Token == "" {
 			cfg.Runner.Token = runner.Token
 		}
-		if len(runner.RunnerWorker) != 0 {
+		if len(cfg.Runner.RunnerWorker) == 0 {
 			cfg.Runner.RunnerWorker = runner.RunnerWorker
 		}
-		if len(runner.Labels) != 0 {
+		if len(cfg.Runner.Labels) == 0 {
 			cfg.Runner.Labels = runner.Labels
 		}
-		if runner.Address != "" {
+		if cfg.Client.Address == "" {
 			cfg.Client.Address = runner.Address
+		}
+		if cfg.Runner.Name == "" {
+			cfg.Runner.Name = runner.Name
 		}
 	}
 

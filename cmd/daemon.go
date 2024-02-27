@@ -9,6 +9,8 @@ import (
 	"gitea.com/gitea/act_runner/poller"
 	"gitea.com/gitea/act_runner/runtime"
 
+	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
+	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
@@ -44,6 +46,23 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			Environ:       cfg.Runner.Environ,
 			Labels:        cfg.Runner.Labels,
 			RunnerWorker:  cfg.Runner.RunnerWorker,
+		}
+
+		resp, err := cli.Declare(cmd.Context(), &connect.Request[runnerv1.DeclareRequest]{
+			Msg: &runnerv1.DeclareRequest{
+				Version: cmd.Root().Version,
+				Labels:  runner.Labels,
+			},
+		})
+		if err != nil && connect.CodeOf(err) == connect.CodeUnimplemented {
+			// Gitea instance is older version. skip declare step.
+			log.Info("Because the Gitea instance is an old version, labels can only be set during configure.")
+		} else if err != nil {
+			log.WithError(err).Error("fail to invoke Declare")
+			return err
+		} else {
+			log.Infof("runner: %s, with version: %s, with labels: %v, declare successfully",
+				resp.Msg.Runner.Name, resp.Msg.Runner.Version, resp.Msg.Runner.Labels)
 		}
 
 		poller := poller.New(
