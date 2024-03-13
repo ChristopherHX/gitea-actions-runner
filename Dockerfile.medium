@@ -57,7 +57,7 @@ COPY --chown=runner:docker --from=build /actions-runner .
 
 RUN mkdir -p /runner && chown runner:docker -R /runner && ln -s /data/.actions_runner .runner
 
-USER runner
+USER 1000
 
 WORKDIR /runner
 RUN chown runner:docker /runner && mkdir -p /home/runner/_work && chown -R runner:docker /home/runner/_work

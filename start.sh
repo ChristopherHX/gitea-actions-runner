@@ -1,19 +1,13 @@
 #!/usr/bin/env bash
-sudo chown -R runner:docker /home/runner/_work
 
 if [[ ! -d /data ]]; then
-  sudo mkdir -p /data
+  mkdir -p /data
 fi
 
 cd /data
-sudo chown -R runner:docker /data
 
 RUNNER_STATE_FILE=${RUNNER_STATE_FILE:-'.runner'}
 
-CONFIG_ARG=""
-if [[ ! -z "${CONFIG_FILE}" ]]; then
-  CONFIG_ARG="--config ${CONFIG_FILE}"
-fi
 EXTRA_ARGS=""
 if [[ ! -z "${GITEA_RUNNER_LABELS}" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --labels ${GITEA_RUNNER_LABELS}"
@@ -41,7 +35,7 @@ if [[ ! -s "$RUNNER_STATE_FILE" ]]; then
       --token    "${GITEA_RUNNER_REGISTRATION_TOKEN}" \
       --name     "${GITEA_RUNNER_NAME:-`hostname`}" \
       --worker python3,/runner/actions-runner-worker.py,/home/runner/bin/Runner.Worker \
-      ${CONFIG_ARG} ${EXTRA_ARGS} --no-interactive 2>&1 | tee /tmp/reg.log
+      ${EXTRA_ARGS} --no-interactive 2>&1 | tee /tmp/reg.log
 
     cat /tmp/reg.log | grep 'Runner registered successfully' > /dev/null
     if [[ $? -eq 0 ]]; then
@@ -59,6 +53,14 @@ if [[ ! -s "$RUNNER_STATE_FILE" ]]; then
     fi
   done
 fi
+
+if [[ ! -s "/data/.actions_runner" ]]; then
+  jq --null-input \
+         --arg agentName "${GITEA_RUNNER_NAME:-`hostname`}" \
+         --arg workFolder "/home/runner/_work" \
+        '{ "isHostedServer": false, "agentName": $agentName, "workFolder": $workFolder }' > /data/.actions_runner
+fi
+
 # Prevent reading the token from the act_runner process
 unset GITEA_RUNNER_REGISTRATION_TOKEN
 unset GITEA_RUNNER_REGISTRATION_TOKEN_FILE
