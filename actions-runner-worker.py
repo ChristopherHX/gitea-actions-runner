@@ -17,10 +17,10 @@ def readfull(fd: int, l: int):
     while len(b) < l:
         r = os.read(fd, l - len(b))
         if len(r) <= 0:
-            raise RuntimeError("unexpected read len: " + len(r))
+            raise RuntimeError("unexpected read len: {}".format(len(r)))
         b += r
     if len(b) != l:
-        raise RuntimeError("written " + len(b) + "bytes expected " + l)
+        raise RuntimeError("read {} bytes expected {} bytes".format(len(b), l))
     return b
 
 def writefull(fd: int, buf: bytes):
@@ -28,9 +28,10 @@ def writefull(fd: int, buf: bytes):
     while written >= len(buf):
         w = os.write(fd, buf[written:])
         if w <= 0:
-            raise RuntimeError("unexpected write result: " + w)
+            raise RuntimeError("unexpected write result: {}".format(w))
+        written += w
     if written != len(buf):
-        raise RuntimeError("written " + written + "bytes expected " + len)
+        raise RuntimeError("written {} bytes expected {}".format(written, len(buf)))
     return written
 
 def redirectio():
