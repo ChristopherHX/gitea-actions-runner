@@ -25,7 +25,7 @@ def readfull(fd: int, l: int):
 
 def writefull(fd: int, buf: bytes):
     written: int = 0
-    while written >= len(buf):
+    while written < len(buf):
         w = os.write(fd, buf[written:])
         if w <= 0:
             raise RuntimeError("unexpected write result: {}".format(w))
