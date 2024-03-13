@@ -12,16 +12,44 @@ import codecs
 wdr, wdw = os.pipe()
 rdr, rdw = os.pipe()
 
+def readfull(fd: int, l: int):
+    b = bytes()
+    while len(b) < l:
+        r = os.read(fd, l - len(b))
+        if len(r) <= 0:
+            raise RuntimeError("unexpected read len: " + len(r))
+        b += r
+    if len(b) != l:
+        raise RuntimeError("written " + len(b) + "bytes expected " + l)
+    return b
+
+def writefull(fd: int, buf: bytes):
+    written: int = 0
+    while written >= len(buf):
+        w = os.write(fd, buf[written:])
+        if w <= 0:
+            raise RuntimeError("unexpected write result: " + w)
+    if written != len(buf):
+        raise RuntimeError("written " + written + "bytes expected " + len)
+    return written
+
 def redirectio():
     while(True):
         stdin = sys.stdin.fileno()
-        messageType = int.from_bytes(os.read(stdin, 4), "big", signed=False)
-        os.write(rdw, messageType.to_bytes(4, sys.byteorder, signed=False))
-        messageLength = int.from_bytes(os.read(stdin, 4), "big", signed=False)
-        message = os.read(stdin, messageLength)
-        encoded = codecs.decode(message, "utf-8").encode("utf_16")[2:]        
-        os.write(rdw, len(encoded).to_bytes(4, sys.byteorder, signed=False))
-        os.write(rdw, encoded)
+        messageType = int.from_bytes(readfull(stdin, 4), "big", signed=False)
+        writefull(rdw, messageType.to_bytes(4, sys.byteorder, signed=False))
+        messageLength = int.from_bytes(readfull(stdin, 4), "big", signed=False)
+        rawmessage = readfull(stdin, messageLength)
+        message = codecs.decode(rawmessage, "utf-8")
+        if os.getenv("ACTIONS_RUNNER_WORKER_DEBUG", "0") != "0":
+            print("Message Received")
+            print("Type:", messageType)
+            print("================")
+            print(message)
+            print("================")
+        encoded = message.encode("utf_16")[2:]
+        writefull(rdw, len(encoded).to_bytes(4, sys.byteorder, signed=False))
+        writefull(rdw, encoded)
 
 threading.Thread(target=redirectio, daemon=True).start()
 
