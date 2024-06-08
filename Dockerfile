@@ -4,10 +4,10 @@ FROM mcr.microsoft.com/dotnet/runtime-deps:6.0-jammy as build
 
 ARG TARGETOS
 ARG TARGETARCH
-ARG RUNNER_VERSION=2.314.0
-ARG RUNNER_CONTAINER_HOOKS_VERSION=0.5.1
-ARG DOCKER_VERSION=25.0.2
-ARG BUILDX_VERSION=0.12.1
+ARG RUNNER_VERSION=2.317.0
+ARG RUNNER_CONTAINER_HOOKS_VERSION=0.6.0
+ARG DOCKER_VERSION=25.0.5
+ARG BUILDX_VERSION=0.13.2
 
 RUN apt update -y && apt install curl unzip -y
 
@@ -85,7 +85,7 @@ RUN mkdir -p /runner && chown runner:docker -R /runner && ln -s /data/.actions_r
 USER 1000
 
 WORKDIR /runner
-RUN chown runner:docker /runner && mkdir -p /home/runner/_work && chown -R runner:docker /home/runner/_work
+RUN chown runner:docker /runner && mkdir -p /home/runner/_work && chown -R runner:docker /home/runner/_work && mkdir -p /data && chown runner:docker /data
 
 COPY --from=builder /opt/src/gitea-actions-runner/gitea-actions-runner /runner/gitea-actions-runner
 
