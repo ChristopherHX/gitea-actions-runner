@@ -82,10 +82,10 @@ RUN install -o root -g root -m 755 docker/* /usr/bin/ && rm -rf docker
 
 RUN mkdir -p /runner && chown runner:docker -R /runner && ln -s /data/.actions_runner .runner
 
-USER 1000
-
 WORKDIR /runner
 RUN chown runner:docker /runner && mkdir -p /home/runner/_work && chown -R runner:docker /home/runner/_work && mkdir -p /data && chown runner:docker /data
+
+USER 1000
 
 COPY --from=builder /opt/src/gitea-actions-runner/gitea-actions-runner /runner/gitea-actions-runner
 
