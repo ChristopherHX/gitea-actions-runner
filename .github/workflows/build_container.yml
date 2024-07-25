@@ -59,7 +59,7 @@ jobs:
         OWNER: ${{github.repository_owner}}
     -
       name: Build and push
-      uses: docker/build-push-action@v3
+      uses: docker/build-push-action@v5
       with:
         context: .
         file: ${{ matrix.Dockerfile || 'Dockerfile' }}

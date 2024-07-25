@@ -493,9 +493,35 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	if ip == nil {
 		ip = net.IPv4(127, 0, 0, 1)
 	}
+	hostname := ip.String()
+	if hn := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_HOSTNAME"); hn != "" {
+		hostname = hn
+	} else if v := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_USE_POD_HOSTNAME"); v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") || strings.EqualFold(v, "y") {
+		hostname, _ = os.Hostname()
+	} else if v := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_USE_POD_DNS"); v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") || strings.EqualFold(v, "y") {
+		names, err := net.LookupAddr(hostname)
+		if err != nil {
+			return err
+		}
+		if len(names) >= 1 {
+			hostname = names[0]
+		}
+	}
+	if v := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_APPEND_NO_PROXY"); v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") || strings.EqualFold(v, "y") {
+		no_proxy := os.Getenv("no_proxy")
+		if no_proxy == "" {
+			no_proxy = os.Getenv("NO_PROXY")
+		}
+		if no_proxy != "" {
+			no_proxy += ","
+		}
+		os.Setenv("no_proxy", no_proxy)
+		os.Setenv("NO_PROXY", no_proxy)
+	}
+
 	var cacheServerUrl string
 	if wd, err := os.Getwd(); err == nil {
-		if cache, err := artifactcache.StartHandler(filepath.Join(wd, "cache"), ip.String(), 0, log.New()); err == nil {
+		if cache, err := artifactcache.StartHandler(filepath.Join(wd, "cache"), hostname, 0, log.New()); err == nil {
 			cacheServerUrl = cache.ExternalURL() + "/"
 			defer cache.Close()
 		}
@@ -736,7 +762,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 						"CacheServerUrl":    cacheServerUrl,
 						"ResultsServiceUrl": server_url,
 					},
-					URL: fmt.Sprintf("http://%s:%d/", ip.String(), listener.Addr().(*net.TCPAddr).Port),
+					URL: fmt.Sprintf("http://%s:%d/", hostname, listener.Addr().(*net.TCPAddr).Port),
 					Authorization: protocol.JobAuthorization{
 						Scheme: "OAuth",
 						Parameters: map[string]string{
