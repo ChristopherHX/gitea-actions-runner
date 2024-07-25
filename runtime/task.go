@@ -496,9 +496,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	hostname := ip.String()
 	if hn := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_HOSTNAME"); hn != "" {
 		hostname = hn
-	} else if v := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_USE_POD_HOSTNAME"); v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") || strings.EqualFold(v, "y") {
-		hostname, _ = os.Hostname()
-	} else if v := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_USE_POD_DNS"); v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") || strings.EqualFold(v, "y") {
+	} else if v := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_USE_DNS_NAME"); v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") || strings.EqualFold(v, "y") {
 		names, err := net.LookupAddr(hostname)
 		if err != nil {
 			return err
@@ -515,6 +513,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		if no_proxy != "" {
 			no_proxy += ","
 		}
+		no_proxy += hostname
 		os.Setenv("no_proxy", no_proxy)
 		os.Setenv("NO_PROXY", no_proxy)
 	}
