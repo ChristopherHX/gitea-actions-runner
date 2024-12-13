@@ -92,4 +92,4 @@ COPY --from=builder /opt/src/gitea-actions-runner/gitea-actions-runner /runner/g
 COPY actions-runner-worker.py /runner
 COPY start.sh /runner
 
-CMD ["bash", "/runner/start.sh"]
+ENTRYPOINT ["bash", "/runner/start.sh"]
