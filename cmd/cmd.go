@@ -89,9 +89,10 @@ func Execute(ctx context.Context) {
 	daemonCmd := &cobra.Command{
 		Use:   "daemon",
 		Short: "Run as a runner daemon",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  cobra.MaximumNArgs(0),
 		RunE:  runDaemon(ctx, gArgs.EnvFile),
 	}
+	daemonCmd.Flags().Bool("once", false, "Run one job and exit after completion")
 	// add all command
 	rootCmd.AddCommand(daemonCmd)
 

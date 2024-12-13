@@ -37,6 +37,7 @@ type Poller struct {
 	ready        chan struct{}
 	workerNum    int
 	tasksVersion atomic.Int64 // tasksVersion used to store the version of the last task fetched from the Gitea.
+	Once         bool
 }
 
 func (p *Poller) schedule() {
@@ -56,7 +57,10 @@ func (p *Poller) Wait() {
 	p.routineGroup.Wait()
 }
 
-func (p *Poller) Poll(ctx context.Context) error {
+func (p *Poller) Poll(rootctx context.Context) error {
+	ctx, cancel := context.WithCancel(rootctx)
+	defer cancel()
+
 	l := log.WithField("func", "Poll")
 
 	for {
@@ -86,6 +90,7 @@ func (p *Poller) Poll(ctx context.Context) error {
 
 				p.metric.IncBusyWorker()
 				p.routineGroup.Run(func() {
+					defer cancel()
 					defer p.schedule()
 					defer p.metric.DecBusyWorker()
 					if err := p.dispatchTask(ctx, task); err != nil {

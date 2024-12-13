@@ -65,11 +65,16 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 				resp.Msg.Runner.Name, resp.Msg.Runner.Version, resp.Msg.Runner.Labels)
 		}
 
+		once, _ := cmd.Flags().GetBool("once")
+		if once {
+			cfg.Runner.Capacity = 1
+		}
 		poller := poller.New(
 			cli,
 			runner.Run,
 			cfg.Runner.Capacity,
 		)
+		poller.Once = once
 
 		g.Go(func() error {
 			l := log.WithField("capacity", cfg.Runner.Capacity).
