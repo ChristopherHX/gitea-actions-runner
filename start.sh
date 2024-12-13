@@ -65,4 +65,4 @@ fi
 unset GITEA_RUNNER_REGISTRATION_TOKEN
 unset GITEA_RUNNER_REGISTRATION_TOKEN_FILE
 
-/runner/gitea-actions-runner daemon ${CONFIG_ARG}
+/runner/gitea-actions-runner daemon "$@" ${GITEA_RUNNER_ONCE+"--once"}
