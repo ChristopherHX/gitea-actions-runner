@@ -90,7 +90,9 @@ func (p *Poller) Poll(rootctx context.Context) error {
 
 				p.metric.IncBusyWorker()
 				p.routineGroup.Run(func() {
-					defer cancel()
+					if p.Once {
+						defer cancel()
+					}
 					defer p.schedule()
 					defer p.metric.DecBusyWorker()
 					if err := p.dispatchTask(ctx, task); err != nil {
