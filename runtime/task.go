@@ -92,6 +92,10 @@ func ToTemplateToken(node yaml.Node) *protocol.TemplateToken {
 		token.FromRawObject(val)
 		return token
 	case yaml.SequenceNode:
+		// Gitea specfic service container cmd broke services in this adapter, skip empty array to avoid error
+		if len(node.Content) == 0 {
+			return nil
+		}
 		content := make([]protocol.TemplateToken, len(node.Content))
 		for i := 0; i < len(content); i++ {
 			content[i] = *ToTemplateToken(*node.Content[i])
@@ -654,6 +658,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			Condition:        condition,
 			DisplayNameToken: displayName,
 			ContextName:      s.ID,
+			Name:             s.ID,
 			Id:               uuid.New().String(),
 			Environment:      environment,
 			TimeoutInMinutes: timeoutInMinutes,

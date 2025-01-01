@@ -67,6 +67,8 @@ git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGy
 git.apache.org/thrift.git v0.12.0/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
 gitea.com/ChristopherHX/github-act-runner v0.0.0-20230107151555-a42f45f85dda h1:c5pVYj772r7RnUytKD/Edc9T3xl31yajKKDuuK1idew=
 gitea.com/ChristopherHX/github-act-runner v0.0.0-20230107151555-a42f45f85dda/go.mod h1:6seZmNeuRnWUge/pKHsoOx59QJ0l77YlTpiFOLJDIMM=
+gitea.com/ChristopherHX/github-act-runner v0.0.0-20250101191334-47a23853e4fa h1:5t4BoH/tFZ22wZ6ilV4+MyIIIVKm/3262b0Jm3gErdU=
+gitea.com/ChristopherHX/github-act-runner v0.0.0-20250101191334-47a23853e4fa/go.mod h1:6seZmNeuRnWUge/pKHsoOx59QJ0l77YlTpiFOLJDIMM=
 gitea.com/gitea/act v0.245.1 h1:mibEHQzIn+2ehaxj3yC3AAFgegiEpC9MP1ZjjI6e3D8=
 gitea.com/gitea/act v0.245.1/go.mod h1:1ffiGQZAZCLuk9QEBDdbRuQj1GL4uAQk6GNNtcEnPmI=
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8/go.mod h1:CzsSbkDixRphAF5hS6wbMKq0eI6ccJRb7/A0M6JBnwg=

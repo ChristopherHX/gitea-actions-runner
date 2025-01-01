@@ -8,6 +8,7 @@ require (
 	github.com/bufbuild/connect-go v1.3.1
 	github.com/google/uuid v1.3.0
 	github.com/joho/godotenv v1.5.1
+	github.com/kardianos/service v1.2.2
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/mattn/go-isatty v0.0.18
 	github.com/nektos/act v0.2.45
@@ -34,7 +35,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
-	github.com/kardianos/service v1.2.2 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
@@ -55,4 +55,4 @@ require (
 
 replace github.com/nektos/act => gitea.com/gitea/act v0.245.1
 
-replace github.com/ChristopherHX/github-act-runner => gitea.com/ChristopherHX/github-act-runner v0.0.0-20230107151555-a42f45f85dda
+replace github.com/ChristopherHX/github-act-runner => gitea.com/ChristopherHX/github-act-runner v0.0.0-20250101191334-47a23853e4fa
