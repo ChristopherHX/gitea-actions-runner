@@ -1,6 +1,6 @@
 # This script can be used to call Runner.Worker as github-act-runner worker on unix like systems
 # You just have to create simple .runner file in the root folder with the following Content
-# {"workFolder": "_work"}
+# {"isHostedServer": false, "agentName": "my-runner", "workFolder": "_work"}
 # Then use `python3 path/to/this/script.py path/to/actions/runner/bin/Runner.Worker` as the worker args
 
 import sys

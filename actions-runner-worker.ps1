@@ -1,8 +1,15 @@
 param ($Worker)
 # This script can be used to call Runner.Worker as github-act-runner worker
 # You just have to create simple .runner file in the root folder with the following Content
-# {"workFolder": "_work"}
+# {"isHostedServer": false, "agentName": "my-runner", "workFolder": "_work"}
 # Then use `pwsh path/to/this/script.ps1 path/to/actions/runner/bin/Runner.Worker` as the worker args
+
+# Fallback if not existing
+$runnerFile = (Join-Path $Worker "../.." -Resolve)
+if(-not (Test-Path $runnerFile))  {                                                                              
+    Write-Output '{"isHostedServer": false, "agentName": "my-runner", "workFolder": "_work"}' | Out-File $runnerFile
+}
+
 $stdin = [System.Console]::OpenStandardInput()
 $pipeOut = New-Object -TypeName System.IO.Pipes.AnonymousPipeServerStream -ArgumentList 'Out','Inheritable'
 $pipeIn = New-Object -TypeName System.IO.Pipes.AnonymousPipeServerStream -ArgumentList 'In','Inheritable'
@@ -17,8 +24,17 @@ $inputjob = Start-ThreadJob -ScriptBlock {
     $pipeIn = $using:pipeIn
     $proc = $using:proc
     $buf = New-Object byte[] 4
+    function ReadStdin($buf, $offset, $len) {
+        # We should read exactly, if available
+        if($stdin.ReadExactly) {
+            $stdin.ReadExactly($buf, $offset, $len)
+        } else {
+            # broken fallback
+            $stdin.Read($buf, $offset, $len)
+        }
+    }
     while( -Not $proc.HasExited ) {
-        $stdin.Read($buf, 0, 4)
+        ReadStdin $buf 0 4
         $messageType = [System.Buffers.Binary.BinaryPrimitives]::ReadInt32BigEndian($buf)
         if($proc.HasExited) {
             return
@@ -26,10 +42,10 @@ $inputjob = Start-ThreadJob -ScriptBlock {
         if($messageType -eq 0) {
             return
         }
-        $stdin.Read($buf, 0, 4)
+        ReadStdin $buf 0 4
         $contentLength = [System.Buffers.Binary.BinaryPrimitives]::ReadInt32BigEndian($buf)
         $rawcontent = New-Object byte[] $contentLength
-        $stdin.Read($rawcontent, 0, $contentLength)
+        ReadStdin $rawcontent 0 $contentLength
         $utf8Content = [System.Text.Encoding]::UTF8.GetString($rawcontent)
         $content = [System.Text.Encoding]::Unicode.GetBytes($utf8Content)
         $pipeOut.Write([BitConverter]::GetBytes($messageType), 0, 4)
