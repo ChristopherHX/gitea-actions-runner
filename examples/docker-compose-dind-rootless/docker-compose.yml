@@ -1,4 +1,7 @@
-# docker-compose.yml 
+# docker-compose.yml
+# Known issues
+# - alpine images may be unable to resolve dns
+# - exposed ports of docker container are bound inside of the `docker` DinD container, localhost:<port> doesn't work
 networks:
   runner:
     external: false

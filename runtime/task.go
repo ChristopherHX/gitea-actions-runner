@@ -666,6 +666,11 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		})
 	}
 
+	// actions/runner defect https://github.com/actions/runner/issues/2783 if and only if ACTIONS_RUNNER_CONTAINER_HOOKS is used
+	for k := range job.Services {
+		job.Services[k].Options += " --network-alias " + k
+	}
+
 	jobServiceContainers := yaml.Node{}
 	jobServiceContainers.Encode(job.Services)
 

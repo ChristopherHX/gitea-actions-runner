@@ -1,4 +1,6 @@
 # docker-compose.yml
+# Known issues
+# - exposed ports of docker container are bound inside of the `docker` DinD container, localhost:<port> doesn't work
 networks:
   runner:
     external: false
