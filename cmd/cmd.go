@@ -20,6 +20,7 @@ type globalArgs struct {
 type RunRunnerSvc struct {
 	stop func()
 	wait chan error
+	cmd *cobra.Command
 }
 
 // Start implements service.Interface.
@@ -32,7 +33,7 @@ func (svc *RunRunnerSvc) Start(s service.Service) error {
 	go func() {
 		defer cancel()
 		defer close(svc.wait)
-		err := runDaemon(ctx, "")(nil, nil)
+		err := runDaemon(ctx, "")(svc.cmd, nil)
 		if err != nil {
 			fmt.Println(err.Error())
 		}
@@ -128,7 +129,9 @@ func Execute(ctx context.Context) {
 				fmt.Fprintf(os.Stderr, "Failed to load godotenv file '%s': %s", gArgs.EnvFile, err.Error())
 			}
 
-			svc, err := service.New(&RunRunnerSvc{}, getSvcConfig(wd, gArgs))
+			svc, err := service.New(&RunRunnerSvc{
+				cmd: cmdSvc,
+			}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
 				return err
@@ -141,7 +144,9 @@ func Execute(ctx context.Context) {
 		Use:   "install",
 		Short: "Install the service may require admin privileges",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := service.New(&RunRunnerSvc{}, getSvcConfig(wd, gArgs))
+			svc, err := service.New(&RunRunnerSvc{
+				cmd: cmdSvc,
+			}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
 				return err
@@ -158,7 +163,9 @@ func Execute(ctx context.Context) {
 		Use:   "uninstall",
 		Short: "Uninstall the service may require admin privileges",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := service.New(&RunRunnerSvc{}, getSvcConfig(wd, gArgs))
+			svc, err := service.New(&RunRunnerSvc{
+				cmd: cmdSvc,
+			}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
 				return err
