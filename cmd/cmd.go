@@ -130,7 +130,7 @@ func Execute(ctx context.Context) {
 			}
 
 			svc, err := service.New(&RunRunnerSvc{
-				cmd: cmdSvc,
+				cmd: cmd,
 			}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
@@ -145,7 +145,7 @@ func Execute(ctx context.Context) {
 		Short: "Install the service may require admin privileges",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := service.New(&RunRunnerSvc{
-				cmd: cmdSvc,
+				cmd: cmd,
 			}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
@@ -164,7 +164,7 @@ func Execute(ctx context.Context) {
 		Short: "Uninstall the service may require admin privileges",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := service.New(&RunRunnerSvc{
-				cmd: cmdSvc,
+				cmd: cmd,
 			}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
@@ -177,7 +177,9 @@ func Execute(ctx context.Context) {
 		Use:   "start",
 		Short: "Start the service may require admin privileges",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := service.New(&RunRunnerSvc{}, getSvcConfig(wd, gArgs))
+			svc, err := service.New(&RunRunnerSvc{
+				cmd: cmd,
+			}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
 				return err
@@ -189,7 +191,9 @@ func Execute(ctx context.Context) {
 		Use:   "stop",
 		Short: "Stop the service may require admin privileges",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := service.New(&RunRunnerSvc{}, getSvcConfig(wd, gArgs))
+			svc, err := service.New(&RunRunnerSvc{
+				cmd: cmd,
+			}, getSvcConfig(wd, gArgs))
 
 			if err != nil {
 				return err
