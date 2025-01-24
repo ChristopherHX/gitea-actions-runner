@@ -34,6 +34,8 @@ import (
 	"github.com/nektos/act/pkg/model"
 	"github.com/rhysd/actionlint"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/avast/retry-go/v4"
 )
 
 var globalTaskMap sync.Map
@@ -313,10 +315,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		if err != nil {
 			taskState.Result = runnerv1.Result_RESULT_FAILURE
 		}
-		t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
-			State: taskState,
-		}))
-		return nil
+		return updateTask(ctx, t, taskState, cancel, nil)
 	}
 	outputs := map[string]string{}
 	for i := 0; i < len(taskState.Steps); i++ {
@@ -334,7 +333,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			select {
 			case obj, ok = <-aserver.TraceLog:
 			case <-time.After(time.Minute):
-				updateTask(ctx, t, taskState, cancel)
+				updateTask(ctx, t, taskState, cancel, nil)
 				nextMsg = true
 			}
 			if nextMsg {
@@ -391,7 +390,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					taskState.Steps[stepIndex].LogLength = step.LogLength
 				}
 				// The cancel request message is hidden in the implementation depth of the act_runner
-				updateTask(ctx, t, taskState, cancel)
+				updateTask(ctx, t, taskState, cancel, nil)
 			} else if timeline, ok := obj.(*protocol.TimelineRecordWrapper); ok {
 				for _, rec := range timeline.Value {
 					step, ok := stepMeta[rec.ID]
@@ -487,10 +486,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			taskState.Result = runnerv1.Result_RESULT_FAILURE
 		}
 		taskState.StoppedAt = timestamppb.Now()
-		t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
-			State:   taskState,
-			Outputs: outputs,
-		}))
+		updateTask(ctx, t, taskState, cancel, outputs)
 	}()
 
 	ip := common.GetOutboundIP()
@@ -881,14 +877,29 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	return nil
 }
 
-func updateTask(ctx context.Context, t *Task, taskState *runnerv1.TaskState, cancel context.CancelFunc) {
+func updateTaskNoRetry(ctx context.Context, t *Task, taskState *runnerv1.TaskState, cancel context.CancelFunc, outputs map[string]string) error {
 	resp, err := t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
 		State: taskState,
+		Outputs: outputs,
 	}))
 
 	if err == nil && resp.Msg.State != nil && resp.Msg.State.Result != runnerv1.Result_RESULT_UNSPECIFIED {
 		cancel()
 	}
+	if err != nil {
+		fmt.Printf("failed to updateTask: %s\n", err.Error())
+	}
+	return err
+}
+
+func updateTask(ctx context.Context, t *Task, taskState *runnerv1.TaskState, cancel context.CancelFunc, outputs map[string]string) error {
+	if taskState.Result == runnerv1.Result_RESULT_UNSPECIFIED {
+		return updateTaskNoRetry(ctx, t, taskState, cancel, outputs)
+	}
+	
+	return retry.Do(func() error {
+		return updateTaskNoRetry(ctx, t, taskState, cancel, outputs)
+	}, retry.Context(ctx))
 }
 
 func convertToRawMap(data map[string]string) map[string]interface{} {
