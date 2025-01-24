@@ -120,7 +120,7 @@ func validateLabels(labels []string) error {
 func (r *registerInputs) assignToNext(stage registerStage, value string) registerStage {
 	// must set instance address and token.
 	// if empty, keep current stage.
-	if stage == StageInputInstance || stage == StageInputToken {
+	if stage == StageInputInstance || stage == StageInputToken || stage == StageInputRunnerWorker {
 		if value == "" {
 			return stage
 		}
@@ -139,6 +139,9 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 		return StageExit
 	case StageInputRunnerWorker:
 		r.RunnerWorker = strings.Split(value, ",")
+		if len(r.RunnerWorker) == 0 {
+			return StageInputRunnerWorker
+		}
 		return StageInputInstance
 	case StageInputInstance:
 		r.InstanceAddr = value
