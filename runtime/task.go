@@ -426,12 +426,12 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 						}
 						// Updated timestamp format to allow variable amount of fraction and time offset
 						if step.StartedAt == nil && v.StartTime != "" {
-							if t, err := time.Parse("2006-01-02T15:04:05.9999999Z07:00", v.StartTime); err == nil {
+							if t, err := time.Parse("2006-01-02T15:04:05.9999999Z07:00", v.StartTime); err == nil && !t.IsZero() {
 								step.StartedAt = timestamppb.New(t)
 							}
 						}
 						if step.StoppedAt == nil && v.FinishTime != nil {
-							if t, err := time.Parse("2006-01-02T15:04:05.9999999Z07:00", *v.FinishTime); err == nil {
+							if t, err := time.Parse("2006-01-02T15:04:05.9999999Z07:00", *v.FinishTime); err == nil && !t.IsZero() {
 								step.StoppedAt = timestamppb.New(t)
 							}
 						}
@@ -877,9 +877,52 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	return nil
 }
 
+// Check Timeline Integrity adding fake started and stopped boundaries
+func checkIntegrity(taskState *runnerv1.TaskState) {
+	stepsWithPrePost := []*runnerv1.StepState{
+		{
+			StartedAt: taskState.StartedAt,
+			StoppedAt: taskState.StartedAt,
+		},
+	}
+	stepsWithPrePost = append(stepsWithPrePost, taskState.Steps...)
+	stepsWithPrePost = append(stepsWithPrePost, &runnerv1.StepState{
+		StartedAt: taskState.StoppedAt,
+		StoppedAt: taskState.StoppedAt,
+		Result:    taskState.Result,
+	})
+	endTime := timestamppb.Now()
+	for i := len(stepsWithPrePost) - 1; i > 0; i-- {
+		step := stepsWithPrePost[i]
+		pstep := stepsWithPrePost[i-1]
+
+		if step.StoppedAt == nil && step.Result != runnerv1.Result_RESULT_UNSPECIFIED {
+			step.StoppedAt = endTime
+		}
+		if step.StoppedAt != nil && step.Result == runnerv1.Result_RESULT_UNSPECIFIED {
+			step.Result = runnerv1.Result_RESULT_SKIPPED
+		}
+
+		if step.StoppedAt != nil {
+			if step.StartedAt == nil || !step.StartedAt.AsTime().Before(step.StoppedAt.AsTime()) {
+				step.StartedAt = step.StoppedAt
+			}
+		}
+		if step.StartedAt != nil {
+			if pstep.StoppedAt == nil || !pstep.StoppedAt.AsTime().Before(step.StartedAt.AsTime()) {
+				pstep.StoppedAt = step.StartedAt
+			}
+		}
+	}
+	// Adjust fixed times of fake pre/post steps
+	taskState.StartedAt = stepsWithPrePost[0].StartedAt
+	taskState.StoppedAt = stepsWithPrePost[len(stepsWithPrePost)-1].StoppedAt
+	taskState.Result = stepsWithPrePost[len(stepsWithPrePost)-1].Result
+}
+
 func updateTaskNoRetry(ctx context.Context, t *Task, taskState *runnerv1.TaskState, cancel context.CancelFunc, outputs map[string]string) error {
 	resp, err := t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
-		State: taskState,
+		State:   taskState,
 		Outputs: outputs,
 	}))
 
@@ -893,10 +936,11 @@ func updateTaskNoRetry(ctx context.Context, t *Task, taskState *runnerv1.TaskSta
 }
 
 func updateTask(ctx context.Context, t *Task, taskState *runnerv1.TaskState, cancel context.CancelFunc, outputs map[string]string) error {
+	checkIntegrity(taskState)
 	if taskState.Result == runnerv1.Result_RESULT_UNSPECIFIED {
 		return updateTaskNoRetry(ctx, t, taskState, cancel, outputs)
 	}
-	
+
 	return retry.Do(func() error {
 		return updateTaskNoRetry(ctx, t, taskState, cancel, outputs)
 	}, retry.Context(ctx))
