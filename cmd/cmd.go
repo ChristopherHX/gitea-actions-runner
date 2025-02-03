@@ -20,7 +20,7 @@ type globalArgs struct {
 type RunRunnerSvc struct {
 	stop func()
 	wait chan error
-	cmd *cobra.Command
+	cmd  *cobra.Command
 }
 
 // Start implements service.Interface.
@@ -80,6 +80,8 @@ func Execute(ctx context.Context) {
 		suffix = ".exe"
 	}
 	registerCmd.Flags().StringSliceVar(&regArgs.RunnerWorker, "worker", []string{}, fmt.Sprintf("worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker%s", suffix))
+	registerCmd.Flags().Int32Var(&regArgs.RunnerType, "type", 0, "Runner type to download, 0 for manual see --worker, 1 for official, 2 for ChristopherHX/runner.server (windows container support)")
+	registerCmd.Flags().StringVar(&regArgs.RunnerVersion, "version", "", "Runner version to download without v prefix")
 	registerCmd.Flags().StringVar(&regArgs.InstanceAddr, "instance", "", "Gitea instance address")
 	registerCmd.Flags().StringVar(&regArgs.Token, "token", "", "Runner token")
 	registerCmd.Flags().StringVar(&regArgs.RunnerName, "name", "", "Runner name")

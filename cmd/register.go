@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -14,12 +16,15 @@ import (
 	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/config"
 	"gitea.com/gitea/act_runner/register"
+	"gitea.com/gitea/act_runner/util"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	_ "embed"
 )
 
 // runRegister registers a runner to the server
@@ -67,6 +72,8 @@ type registerArgs struct {
 	Token         string
 	RunnerName    string
 	Labels        string
+	RunnerType    int32
+	RunnerVersion string
 }
 
 type registerStage int8
@@ -74,6 +81,8 @@ type registerStage int8
 const (
 	StageUnknown              registerStage = -1
 	StageOverwriteLocalConfig registerStage = iota + 1
+	StageInputRunnerChoice
+	StageInputRunnerVersion
 	StageInputRunnerWorker
 	StageInputInstance
 	StageInputToken
@@ -90,22 +99,29 @@ var (
 )
 
 type registerInputs struct {
-	RunnerWorker []string
-	InstanceAddr string
-	Token        string
-	RunnerName   string
-	CustomLabels []string
+	RunnerWorker  []string
+	InstanceAddr  string
+	Token         string
+	RunnerName    string
+	CustomLabels  []string
+	RunnerType    int32
+	RunnerVersion string
 }
 
 func (r *registerInputs) validate() error {
-	if len(r.RunnerWorker) == 0 {
-		return fmt.Errorf("Runner.Worker Path is Empty")
-	}
 	if r.InstanceAddr == "" {
 		return fmt.Errorf("instance address is empty")
 	}
 	if r.Token == "" {
 		return fmt.Errorf("token is empty")
+	}
+	if r.RunnerType != 0 {
+		if r.setupRunner() != StageInputInstance {
+			return fmt.Errorf("runner setup failed")
+		}
+	}
+	if len(r.RunnerWorker) == 0 {
+		return fmt.Errorf("Runner.Worker Path is Empty, otherwise add --type 1 or --type 2")
 	}
 	if len(r.CustomLabels) > 0 {
 		return validateLabels(r.CustomLabels)
@@ -117,10 +133,16 @@ func validateLabels(labels []string) error {
 	return nil
 }
 
+//go:embed actions-runner-worker.py
+var pythonWorkerScript string
+
+//go:embed actions-runner-worker.ps1
+var pwshWorkerScript string
+
 func (r *registerInputs) assignToNext(stage registerStage, value string) registerStage {
 	// must set instance address and token.
 	// if empty, keep current stage.
-	if stage == StageInputInstance || stage == StageInputToken || stage == StageInputRunnerWorker {
+	if stage == StageInputInstance || stage == StageInputToken || stage == StageInputRunnerChoice {
 		if value == "" {
 			return stage
 		}
@@ -134,15 +156,33 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 	switch stage {
 	case StageOverwriteLocalConfig:
 		if value == "Y" || value == "y" {
-			return StageInputRunnerWorker
+			return StageInputRunnerChoice
 		}
 		return StageExit
+	case StageInputRunnerChoice:
+		if value == "0" {
+			return StageInputRunnerWorker
+		}
+		if value == "1" {
+			r.RunnerType = 1
+			return StageInputRunnerVersion
+		}
+		if value == "2" {
+			r.RunnerType = 2
+			return StageInputRunnerVersion
+		}
+		log.Infoln("Invalid choice, please input again.")
+		return StageInputRunnerChoice
 	case StageInputRunnerWorker:
 		r.RunnerWorker = strings.Split(value, ",")
 		if len(r.RunnerWorker) == 0 {
-			return StageInputRunnerWorker
+			log.Infoln("Invalid choice, please input again.")
+			return StageInputRunnerChoice
 		}
 		return StageInputInstance
+	case StageInputRunnerVersion:
+		r.RunnerVersion = value
+		return r.setupRunner()
 	case StageInputInstance:
 		r.InstanceAddr = value
 		return StageInputToken
@@ -167,10 +207,76 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 	return StageUnknown
 }
 
+func (r *registerInputs) setupRunner() registerStage {
+	d := util.DownloadRunner
+	if r.RunnerType == 2 {
+		d = util.DownloadRunnerServer
+	}
+	if r.RunnerVersion == "" {
+		if r.RunnerType == 1 {
+			r.RunnerVersion = "2.322.0"
+		} else {
+			r.RunnerVersion = "3.13.2"
+		}
+	}
+	wd, _ := os.Getwd()
+	p := filepath.Join(wd, "actions-runner-"+r.RunnerVersion)
+	if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+		log.Infof("Runner %s already exists, skip downloading.", r.RunnerVersion)
+	} else {
+		if err := d(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, p, r.RunnerVersion); err != nil {
+			log.Infoln("Something went wrong: %s" + err.Error())
+			return StageInputRunnerChoice
+		}
+	}
+
+	pwshScript := filepath.Join(p, "actions-runner-worker.ps1")
+	_ = os.WriteFile(pwshScript, []byte(pwshWorkerScript), 0755)
+	pythonScript := filepath.Join(p, "actions-runner-worker.py")
+	_ = os.WriteFile(pythonScript, []byte(pythonWorkerScript), 0755)
+
+	var pythonPath string
+	var err error
+	ext := ""
+	if runtime.GOOS != "windows" {
+		pythonPath, err = exec.LookPath("python3")
+		if err != nil {
+			pythonPath, _ = exec.LookPath("python")
+		}
+	} else {
+		ext = ".exe"
+	}
+	if pythonPath == "" {
+		pwshPath, err := exec.LookPath("pwsh")
+		if err != nil {
+			pwshVersion := "7.4.7"
+			pwshPath = filepath.Join(wd, "pwsh-"+pwshVersion)
+			if fi, err := os.Stat(pwshPath); err == nil && fi.IsDir() {
+				log.Infof("pwsh %s already exists, skip downloading.", pwshVersion)
+			} else {
+				log.Infoln("pwsh not found, downloading pwsh...")
+				err = util.DownloadPwsh(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, pwshPath, pwshVersion)
+				if err != nil {
+					log.Infoln("Something went wrong: %s" + err.Error())
+					return StageInputRunnerChoice
+				}
+			}
+			pwshPath = filepath.Join(pwshPath, "pwsh"+ext)
+		} else {
+			log.Infoln("pwsh found, using pwsh...")
+		}
+		r.RunnerWorker = []string{pwshPath, pwshScript, filepath.Join(p, "bin", "Runner.Worker"+ext)}
+	} else {
+		log.Infoln("python found, using python...")
+		r.RunnerWorker = []string{pythonPath, pythonScript, filepath.Join(p, "bin", "Runner.Worker"+ext)}
+	}
+	return StageInputInstance
+}
+
 func registerInteractive(envFile string) error {
 	var (
 		reader = bufio.NewReader(os.Stdin)
-		stage  = StageInputRunnerWorker
+		stage  = StageInputRunnerChoice
 		inputs = new(registerInputs)
 	)
 
@@ -215,12 +321,16 @@ func printStageHelp(stage registerStage) {
 	switch stage {
 	case StageOverwriteLocalConfig:
 		log.Infoln("Runner is already registered, overwrite local config? [y/N]")
+	case StageInputRunnerChoice:
+		log.Infoln("Choose between custom worker (0) / official Github Actions Runner (1) / runner.server actions runner (windows container support) (2)? [0/1/2]")
 	case StageInputRunnerWorker:
 		suffix := ""
 		if runtime.GOOS == "windows" {
 			suffix = ".exe"
 		}
 		log.Infof("Enter the worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker%s:\n", suffix)
+	case StageInputRunnerVersion:
+		log.Infoln("Specify the version of the runner? (for example, 3.12.1):")
 	case StageInputInstance:
 		log.Infoln("Enter the Gitea instance URL (for example, https://gitea.com/):")
 	case StageInputToken:
@@ -239,11 +349,13 @@ func registerNoInteractive(envFile string, regArgs *registerArgs) error {
 	_ = godotenv.Load(envFile)
 	cfg, _ := config.FromEnviron()
 	inputs := &registerInputs{
-		RunnerWorker: regArgs.RunnerWorker,
-		InstanceAddr: regArgs.InstanceAddr,
-		Token:        regArgs.Token,
-		RunnerName:   regArgs.RunnerName,
-		CustomLabels: defaultLabels,
+		RunnerWorker:  regArgs.RunnerWorker,
+		InstanceAddr:  regArgs.InstanceAddr,
+		Token:         regArgs.Token,
+		RunnerName:    regArgs.RunnerName,
+		CustomLabels:  defaultLabels,
+		RunnerType:    regArgs.RunnerType,
+		RunnerVersion: regArgs.RunnerVersion,
 	}
 	regArgs.Labels = strings.TrimSpace(regArgs.Labels)
 	if regArgs.Labels != "" {

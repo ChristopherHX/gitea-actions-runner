@@ -12,7 +12,6 @@ import json
 
 worker = sys.argv[1]
 
-# Fallback if not existing
 runner_file = os.path.abspath(os.path.join(worker, '../../.runner'))
 if not os.path.exists(runner_file):
     data = {
