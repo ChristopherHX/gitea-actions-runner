@@ -12,7 +12,7 @@ import json
 
 worker = sys.argv[1]
 
-runner_file = os.path.abspath(os.path.join(worker), '../..') + '/.runner'
+runner_file = os.path.abspath(os.path.join(worker, '../../.runner'))
 if not os.path.exists(runner_file):
     data = {
         'isHostedServer': False,

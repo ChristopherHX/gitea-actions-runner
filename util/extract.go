@@ -79,6 +79,7 @@ func DownloadTool(ctx context.Context, logger Logger, url, dest string) error {
 	httpClient := http.DefaultClient
 	randBytes := make([]byte, 16)
 	_, _ = rand.Read(randBytes)
+	os.MkdirAll(filepath.Dir(dest), 0755)
 	cachedTar := filepath.Join(dest, "..", hex.EncodeToString(randBytes)+".tmp")
 	defer os.Remove(cachedTar)
 	var tarstream io.Reader

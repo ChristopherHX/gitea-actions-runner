@@ -252,7 +252,7 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 func registerInteractive(envFile string) error {
 	var (
 		reader = bufio.NewReader(os.Stdin)
-		stage  = StageInputRunnerWorker
+		stage  = StageInputRunnerChoice
 		inputs = new(registerInputs)
 	)
 
@@ -297,12 +297,16 @@ func printStageHelp(stage registerStage) {
 	switch stage {
 	case StageOverwriteLocalConfig:
 		log.Infoln("Runner is already registered, overwrite local config? [y/N]")
+	case StageInputRunnerChoice:
+		log.Infoln("Choose between custom worker / official actions runner / runner.server actions runner (windows container support)? [0/1/2]")
 	case StageInputRunnerWorker:
 		suffix := ""
 		if runtime.GOOS == "windows" {
 			suffix = ".exe"
 		}
 		log.Infof("Enter the worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker%s:\n", suffix)
+	case StageInputRunnerVersion:
+		log.Infoln("Specify the version of the runner? (for example, 3.12.1):")
 	case StageInputInstance:
 		log.Infoln("Enter the Gitea instance URL (for example, https://gitea.com/):")
 	case StageInputToken:
