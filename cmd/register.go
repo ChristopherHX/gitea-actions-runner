@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -14,12 +16,15 @@ import (
 	"gitea.com/gitea/act_runner/client"
 	"gitea.com/gitea/act_runner/config"
 	"gitea.com/gitea/act_runner/register"
+	"gitea.com/gitea/act_runner/util"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	_ "embed"
 )
 
 // runRegister registers a runner to the server
@@ -74,6 +79,8 @@ type registerStage int8
 const (
 	StageUnknown              registerStage = -1
 	StageOverwriteLocalConfig registerStage = iota + 1
+	StageInputRunnerChoice
+	StageInputRunnerVersion
 	StageInputRunnerWorker
 	StageInputInstance
 	StageInputToken
@@ -95,6 +102,7 @@ type registerInputs struct {
 	Token        string
 	RunnerName   string
 	CustomLabels []string
+	runnerType   int32
 }
 
 func (r *registerInputs) validate() error {
@@ -117,10 +125,16 @@ func validateLabels(labels []string) error {
 	return nil
 }
 
+//go:embed actions-runner-worker.py
+var pythonWorkerScript string
+
+//go:embed actions-runner-worker.ps1
+var pwshWorkerScript string
+
 func (r *registerInputs) assignToNext(stage registerStage, value string) registerStage {
 	// must set instance address and token.
 	// if empty, keep current stage.
-	if stage == StageInputInstance || stage == StageInputToken || stage == StageInputRunnerWorker {
+	if stage == StageInputInstance || stage == StageInputToken || stage == StageInputRunnerChoice {
 		if value == "" {
 			return stage
 		}
@@ -134,13 +148,81 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 	switch stage {
 	case StageOverwriteLocalConfig:
 		if value == "Y" || value == "y" {
-			return StageInputRunnerWorker
+			return StageInputRunnerChoice
 		}
 		return StageExit
+	case StageInputRunnerChoice:
+		if value == "0" {
+			return StageInputRunnerWorker
+		}
+		if value == "1" {
+			r.runnerType = 1
+			return StageInputRunnerVersion
+		}
+		if value == "2" {
+			r.runnerType = 2
+			return StageInputRunnerVersion
+		}
+		log.Infoln("Invalid choice, please input again.")
+		return StageInputRunnerChoice
 	case StageInputRunnerWorker:
 		r.RunnerWorker = strings.Split(value, ",")
 		if len(r.RunnerWorker) == 0 {
-			return StageInputRunnerWorker
+			log.Infoln("Invalid choice, please input again.")
+			return StageInputRunnerChoice
+		}
+		return StageInputInstance
+	case StageInputRunnerVersion:
+		d := util.DownloadRunner
+		if r.runnerType == 2 {
+			d = util.DownloadRunnerServer
+		}
+		exePath, _ := os.Executable()
+		p := filepath.Join(filepath.Dir(exePath), "actions-runner-"+value)
+		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+			log.Infof("Runner %s already exists, skip downloading.", value)
+		} else {
+			if err := d(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, p, value); err != nil {
+				log.Infoln("Something went wrong: %s" + err.Error())
+				return StageInputRunnerChoice
+			}
+		}
+
+		pwshScript := filepath.Join(p, "actions-runner-worker.ps1")
+		_ = os.WriteFile(pwshScript, []byte(pwshWorkerScript), 0755)
+		pythonScript := filepath.Join(p, "actions-runner-worker.py")
+		_ = os.WriteFile(pythonScript, []byte(pythonWorkerScript), 0755)
+
+		var pythonPath string
+		var err error
+		ext := ""
+		if runtime.GOOS != "windows" {
+			pythonPath, err = exec.LookPath("python3")
+			if err != nil {
+				pythonPath, _ = exec.LookPath("python")
+			}
+		} else {
+			ext = ".exe"
+		}
+		if pythonPath == "" {
+			pwshPath, err := exec.LookPath("pwsh")
+			if err != nil {
+				log.Infoln("pwsh not found, downloading pwsh...")
+				pwshVersion := "7.4.7"
+				pwshPath = filepath.Join(filepath.Dir(exePath), "pwsh-"+pwshVersion)
+				err = util.DownloadPwsh(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, pwshPath, pwshVersion)
+				if err != nil {
+					log.Infoln("Something went wrong: %s" + err.Error())
+					return StageInputRunnerChoice
+				}
+				pwshPath = filepath.Join(pwshPath, "pwsh"+ext)
+			} else {
+				log.Infoln("pwsh found, using pwsh...")
+			}
+			r.RunnerWorker = []string{pwshPath, pwshScript, filepath.Join(p, "bin", "Runner.Worker"+ext)}
+		} else {
+			log.Infoln("python found, using python...")
+			r.RunnerWorker = []string{pythonPath, pythonScript, filepath.Join(p, "bin", "Runner.Worker"+ext)}
 		}
 		return StageInputInstance
 	case StageInputInstance:
