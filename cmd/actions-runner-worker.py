@@ -1,6 +1,6 @@
 # This script can be used to call Runner.Worker as github-act-runner worker on unix like systems
 # You just have to create simple .runner file in the root folder with the following Content
-# {"workFolder": "_work"}
+# {"isHostedServer": false, "agentName": "my-runner", "workFolder": "_work"}
 # Then use `python3 path/to/this/script.py path/to/actions/runner/bin/Runner.Worker` as the worker args
 
 import sys
@@ -8,6 +8,19 @@ import subprocess
 import os
 import threading
 import codecs
+import json
+
+worker = sys.argv[1]
+
+runner_file = os.path.abspath(os.path.join(worker), '../..') + '/.runner'
+if not os.path.exists(runner_file):
+    data = {
+        'isHostedServer': False,
+        'agentName': 'my-runner',
+        'workFolder': '_work'
+    }
+    with open(runner_file, 'w') as file:
+        json.dump(data, file)
 
 wdr, wdw = os.pipe()
 rdr, rdw = os.pipe()
@@ -55,7 +68,6 @@ def redirectio():
 threading.Thread(target=redirectio, daemon=True).start()
 
 interpreter = []
-worker = sys.argv[1]
 if worker.endswith(".dll"):
     interpreter = [ "dotnet" ]
 
