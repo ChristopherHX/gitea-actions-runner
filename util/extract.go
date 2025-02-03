@@ -188,10 +188,10 @@ func DownloadRunnerServer(ctx context.Context, logger Logger, plat string, dest 
 	return DownloadTool(ctx, logger, downloadURL, filepath.Join(dest, "bin"))
 }
 
-// Includes windows container support
+// The windows version required pwsh to be able to send the job request, powershell 5 not supported
 func DownloadPwsh(ctx context.Context, logger Logger, plat string, dest string, version string) error {
 	AURL := func(arch, ext string) string {
-		return fmt.Sprintf("https://github.com/PowerShell/PowerShell/releases/download/v%s/powershell-7.4.7-%s.%s", version, arch, ext)
+		return fmt.Sprintf("https://github.com/PowerShell/PowerShell/releases/download/v%s/powershell-%s-%s.%s", version, version, arch, ext)
 	}
 	download := map[string]string{
 		"windows/386":   AURL("win-x86", "zip"),
@@ -208,5 +208,5 @@ func DownloadPwsh(ctx context.Context, logger Logger, plat string, dest string, 
 		return fmt.Errorf("unsupported platform %s", plat)
 	}
 	// Contains only the bin folder content
-	return DownloadTool(ctx, logger, downloadURL, filepath.Join(dest, "bin"))
+	return DownloadTool(ctx, logger, downloadURL, dest)
 }
