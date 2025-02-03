@@ -316,7 +316,7 @@ func printStageHelp(stage registerStage) {
 	case StageOverwriteLocalConfig:
 		log.Infoln("Runner is already registered, overwrite local config? [y/N]")
 	case StageInputRunnerChoice:
-		log.Infoln("Choose between custom worker / official actions runner / runner.server actions runner (windows container support)? [0/1/2]")
+		log.Infoln("Choose between custom worker (0) / official Github Actions Runner (1) / runner.server actions runner (windows container support) (2)? [0/1/2]")
 	case StageInputRunnerWorker:
 		suffix := ""
 		if runtime.GOOS == "windows" {
