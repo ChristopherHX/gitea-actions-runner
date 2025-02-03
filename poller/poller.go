@@ -3,8 +3,11 @@ package poller
 import (
 	"context"
 	"errors"
+	"os"
+	"os/signal"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
@@ -61,6 +64,31 @@ func (p *Poller) Poll(rootctx context.Context) error {
 	ctx, cancel := context.WithCancel(rootctx)
 	defer cancel()
 
+	// this is needed to not force cancel the job by parent context
+	jobCtx, hardCancel := context.WithCancel(context.Background())
+	defer func() {
+		p.Wait()
+		hardCancel()
+	}()
+
+	// trap Ctrl+C to control graceful exit of running jobs
+	channel := make(chan os.Signal, 1)
+	signal.Notify(channel, syscall.SIGTERM, os.Interrupt)
+	defer signal.Stop(channel)
+
+	go func() {
+		sig, ok := <-channel
+		// follow github-act-runner behavior
+		// sigterm will cancel all running jobs
+		if sig == syscall.SIGTERM || !ok {
+			hardCancel()
+			return
+		}
+		// now a second signal always terminates the job
+		<-channel
+		hardCancel()
+	}()
+
 	l := log.WithField("func", "Poll")
 
 	for {
@@ -84,7 +112,11 @@ func (p *Poller) Poll(rootctx context.Context) error {
 					if err != nil {
 						l.Errorf("can't find the task: %v", err.Error())
 					}
-					time.Sleep(5 * time.Second)
+					select {
+					case <-ctx.Done():
+						break LOOP
+					case <-time.After(5 * time.Second):
+					}
 					break
 				}
 
@@ -95,7 +127,7 @@ func (p *Poller) Poll(rootctx context.Context) error {
 					if p.Once {
 						defer cancel()
 					}
-					if err := p.dispatchTask(ctx, task); err != nil {
+					if err := p.dispatchTask(jobCtx, task); err != nil {
 						l.Errorf("execute task: %v", err.Error())
 					}
 				})

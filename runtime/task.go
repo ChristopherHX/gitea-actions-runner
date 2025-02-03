@@ -813,7 +813,9 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	src, _ := json.Marshal(jmessage)
 	jobExecCtx := ctx
 
-	worker := exec.Command(runnerWorker[0], runnerWorker[1:]...)
+	worker := exec.CommandContext(context.Background(), runnerWorker[0], runnerWorker[1:]...)
+	// ignore CTRL+C
+	worker.SysProcAttr = getSysProcAttr()
 	in, err := worker.StdinPipe()
 	if err != nil {
 		return err
