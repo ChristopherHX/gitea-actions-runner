@@ -219,8 +219,8 @@ func (r *registerInputs) setupRunner() registerStage {
 			r.RunnerVersion = "3.13.2"
 		}
 	}
-	exePath, _ := os.Executable()
-	p := filepath.Join(filepath.Dir(exePath), "actions-runner-"+r.RunnerVersion)
+	wd, _ := os.Getwd()
+	p := filepath.Join(wd, "actions-runner-"+r.RunnerVersion)
 	if fi, err := os.Stat(p); err == nil && fi.IsDir() {
 		log.Infof("Runner %s already exists, skip downloading.", r.RunnerVersion)
 	} else {
@@ -251,7 +251,7 @@ func (r *registerInputs) setupRunner() registerStage {
 		if err != nil {
 			log.Infoln("pwsh not found, downloading pwsh...")
 			pwshVersion := "7.4.7"
-			pwshPath = filepath.Join(filepath.Dir(exePath), "pwsh-"+pwshVersion)
+			pwshPath = filepath.Join(wd, "pwsh-"+pwshVersion)
 			err = util.DownloadPwsh(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, pwshPath, pwshVersion)
 			if err != nil {
 				log.Infoln("Something went wrong: %s" + err.Error())
