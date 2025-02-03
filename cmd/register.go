@@ -249,13 +249,17 @@ func (r *registerInputs) setupRunner() registerStage {
 	if pythonPath == "" {
 		pwshPath, err := exec.LookPath("pwsh")
 		if err != nil {
-			log.Infoln("pwsh not found, downloading pwsh...")
 			pwshVersion := "7.4.7"
 			pwshPath = filepath.Join(wd, "pwsh-"+pwshVersion)
-			err = util.DownloadPwsh(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, pwshPath, pwshVersion)
-			if err != nil {
-				log.Infoln("Something went wrong: %s" + err.Error())
-				return StageInputRunnerChoice
+			log.Infoln("pwsh not found, downloading pwsh...")
+			if fi, err := os.Stat(pwshPath); err == nil && fi.IsDir() {
+				log.Infof("pwsh %s already exists, skip downloading.", pwshVersion)
+			} else {
+				err = util.DownloadPwsh(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, pwshPath, pwshVersion)
+				if err != nil {
+					log.Infoln("Something went wrong: %s" + err.Error())
+					return StageInputRunnerChoice
+				}
 			}
 			pwshPath = filepath.Join(pwshPath, "pwsh"+ext)
 		} else {
