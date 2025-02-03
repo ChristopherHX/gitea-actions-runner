@@ -251,10 +251,10 @@ func (r *registerInputs) setupRunner() registerStage {
 		if err != nil {
 			pwshVersion := "7.4.7"
 			pwshPath = filepath.Join(wd, "pwsh-"+pwshVersion)
-			log.Infoln("pwsh not found, downloading pwsh...")
 			if fi, err := os.Stat(pwshPath); err == nil && fi.IsDir() {
 				log.Infof("pwsh %s already exists, skip downloading.", pwshVersion)
 			} else {
+				log.Infoln("pwsh not found, downloading pwsh...")
 				err = util.DownloadPwsh(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, pwshPath, pwshVersion)
 				if err != nil {
 					log.Infoln("Something went wrong: %s" + err.Error())
