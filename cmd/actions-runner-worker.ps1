@@ -5,7 +5,7 @@ param ($Worker)
 # Then use `pwsh path/to/this/script.ps1 path/to/actions/runner/bin/Runner.Worker` as the worker args
 
 # Fallback if not existing
-$runnerFile = (Join-Path $Worker "../.." -Resolve)
+$runnerFile = (Join-Path $Worker "../../.runner" -Resolve)
 if(-not (Test-Path $runnerFile))  {                                                                              
     Write-Output '{"isHostedServer": false, "agentName": "my-runner", "workFolder": "_work"}' | Out-File $runnerFile
 }
