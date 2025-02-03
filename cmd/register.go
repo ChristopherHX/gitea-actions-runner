@@ -109,20 +109,22 @@ type registerInputs struct {
 }
 
 func (r *registerInputs) validate() error {
-	if len(r.RunnerWorker) == 0 {
-		return fmt.Errorf("Runner.Worker Path is Empty")
-	}
 	if r.InstanceAddr == "" {
 		return fmt.Errorf("instance address is empty")
 	}
 	if r.Token == "" {
 		return fmt.Errorf("token is empty")
 	}
+	if r.RunnerType != 0 {
+		if r.setupRunner() != StageInputInstance {
+			return fmt.Errorf("runner setup failed")
+		}
+	}
+	if len(r.RunnerWorker) == 0 {
+		return fmt.Errorf("Runner.Worker Path is Empty, otherwise add --type 1 or --type 2")
+	}
 	if len(r.CustomLabels) > 0 {
 		return validateLabels(r.CustomLabels)
-	}
-	if r.RunnerType != 0 && r.setupRunner() != StageInputInstance {
-		return fmt.Errorf("runner setup failed")
 	}
 	return nil
 }
