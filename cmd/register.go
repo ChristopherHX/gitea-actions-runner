@@ -72,6 +72,8 @@ type registerArgs struct {
 	Token         string
 	RunnerName    string
 	Labels        string
+	RunnerType    int32
+	RunnerVersion string
 }
 
 type registerStage int8
@@ -97,12 +99,13 @@ var (
 )
 
 type registerInputs struct {
-	RunnerWorker []string
-	InstanceAddr string
-	Token        string
-	RunnerName   string
-	CustomLabels []string
-	runnerType   int32
+	RunnerWorker  []string
+	InstanceAddr  string
+	Token         string
+	RunnerName    string
+	CustomLabels  []string
+	RunnerType    int32
+	RunnerVersion string
 }
 
 func (r *registerInputs) validate() error {
@@ -117,6 +120,9 @@ func (r *registerInputs) validate() error {
 	}
 	if len(r.CustomLabels) > 0 {
 		return validateLabels(r.CustomLabels)
+	}
+	if r.RunnerType != 0 && r.setupRunner() != StageInputInstance {
+		return fmt.Errorf("runner setup failed")
 	}
 	return nil
 }
@@ -156,11 +162,11 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 			return StageInputRunnerWorker
 		}
 		if value == "1" {
-			r.runnerType = 1
+			r.RunnerType = 1
 			return StageInputRunnerVersion
 		}
 		if value == "2" {
-			r.runnerType = 2
+			r.RunnerType = 2
 			return StageInputRunnerVersion
 		}
 		log.Infoln("Invalid choice, please input again.")
@@ -173,58 +179,8 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 		}
 		return StageInputInstance
 	case StageInputRunnerVersion:
-		d := util.DownloadRunner
-		if r.runnerType == 2 {
-			d = util.DownloadRunnerServer
-		}
-		exePath, _ := os.Executable()
-		p := filepath.Join(filepath.Dir(exePath), "actions-runner-"+value)
-		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
-			log.Infof("Runner %s already exists, skip downloading.", value)
-		} else {
-			if err := d(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, p, value); err != nil {
-				log.Infoln("Something went wrong: %s" + err.Error())
-				return StageInputRunnerChoice
-			}
-		}
-
-		pwshScript := filepath.Join(p, "actions-runner-worker.ps1")
-		_ = os.WriteFile(pwshScript, []byte(pwshWorkerScript), 0755)
-		pythonScript := filepath.Join(p, "actions-runner-worker.py")
-		_ = os.WriteFile(pythonScript, []byte(pythonWorkerScript), 0755)
-
-		var pythonPath string
-		var err error
-		ext := ""
-		if runtime.GOOS != "windows" {
-			pythonPath, err = exec.LookPath("python3")
-			if err != nil {
-				pythonPath, _ = exec.LookPath("python")
-			}
-		} else {
-			ext = ".exe"
-		}
-		if pythonPath == "" {
-			pwshPath, err := exec.LookPath("pwsh")
-			if err != nil {
-				log.Infoln("pwsh not found, downloading pwsh...")
-				pwshVersion := "7.4.7"
-				pwshPath = filepath.Join(filepath.Dir(exePath), "pwsh-"+pwshVersion)
-				err = util.DownloadPwsh(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, pwshPath, pwshVersion)
-				if err != nil {
-					log.Infoln("Something went wrong: %s" + err.Error())
-					return StageInputRunnerChoice
-				}
-				pwshPath = filepath.Join(pwshPath, "pwsh"+ext)
-			} else {
-				log.Infoln("pwsh found, using pwsh...")
-			}
-			r.RunnerWorker = []string{pwshPath, pwshScript, filepath.Join(p, "bin", "Runner.Worker"+ext)}
-		} else {
-			log.Infoln("python found, using python...")
-			r.RunnerWorker = []string{pythonPath, pythonScript, filepath.Join(p, "bin", "Runner.Worker"+ext)}
-		}
-		return StageInputInstance
+		r.RunnerVersion = value
+		return r.setupRunner()
 	case StageInputInstance:
 		r.InstanceAddr = value
 		return StageInputToken
@@ -247,6 +203,68 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 		return StageWaitingForRegistration
 	}
 	return StageUnknown
+}
+
+func (r *registerInputs) setupRunner() registerStage {
+	d := util.DownloadRunner
+	if r.RunnerType == 2 {
+		d = util.DownloadRunnerServer
+	}
+	if r.RunnerVersion == "" {
+		if r.RunnerType == 1 {
+			r.RunnerVersion = "2.322.0"
+		} else {
+			r.RunnerVersion = "3.13.2"
+		}
+	}
+	exePath, _ := os.Executable()
+	p := filepath.Join(filepath.Dir(exePath), "actions-runner-"+r.RunnerVersion)
+	if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+		log.Infof("Runner %s already exists, skip downloading.", r.RunnerVersion)
+	} else {
+		if err := d(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, p, r.RunnerVersion); err != nil {
+			log.Infoln("Something went wrong: %s" + err.Error())
+			return StageInputRunnerChoice
+		}
+	}
+
+	pwshScript := filepath.Join(p, "actions-runner-worker.ps1")
+	_ = os.WriteFile(pwshScript, []byte(pwshWorkerScript), 0755)
+	pythonScript := filepath.Join(p, "actions-runner-worker.py")
+	_ = os.WriteFile(pythonScript, []byte(pythonWorkerScript), 0755)
+
+	var pythonPath string
+	var err error
+	ext := ""
+	if runtime.GOOS != "windows" {
+		pythonPath, err = exec.LookPath("python3")
+		if err != nil {
+			pythonPath, _ = exec.LookPath("python")
+		}
+	} else {
+		ext = ".exe"
+	}
+	if pythonPath == "" {
+		pwshPath, err := exec.LookPath("pwsh")
+		if err != nil {
+			log.Infoln("pwsh not found, downloading pwsh...")
+			pwshVersion := "7.4.7"
+			pwshPath = filepath.Join(filepath.Dir(exePath), "pwsh-"+pwshVersion)
+			err = util.DownloadPwsh(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, pwshPath, pwshVersion)
+			if err != nil {
+				log.Infoln("Something went wrong: %s" + err.Error())
+				return StageInputRunnerChoice
+			}
+			pwshPath = filepath.Join(pwshPath, "pwsh"+ext)
+		} else {
+			log.Infoln("pwsh found, using pwsh...")
+		}
+		r.RunnerWorker = []string{pwshPath, pwshScript, filepath.Join(p, "bin", "Runner.Worker"+ext)}
+	} else {
+		log.Infoln("python found, using python...")
+		r.RunnerWorker = []string{pythonPath, pythonScript, filepath.Join(p, "bin", "Runner.Worker"+ext)}
+	}
+	return StageInputInstance
 }
 
 func registerInteractive(envFile string) error {
@@ -325,11 +343,13 @@ func registerNoInteractive(envFile string, regArgs *registerArgs) error {
 	_ = godotenv.Load(envFile)
 	cfg, _ := config.FromEnviron()
 	inputs := &registerInputs{
-		RunnerWorker: regArgs.RunnerWorker,
-		InstanceAddr: regArgs.InstanceAddr,
-		Token:        regArgs.Token,
-		RunnerName:   regArgs.RunnerName,
-		CustomLabels: defaultLabels,
+		RunnerWorker:  regArgs.RunnerWorker,
+		InstanceAddr:  regArgs.InstanceAddr,
+		Token:         regArgs.Token,
+		RunnerName:    regArgs.RunnerName,
+		CustomLabels:  defaultLabels,
+		RunnerType:    regArgs.RunnerType,
+		RunnerVersion: regArgs.RunnerVersion,
 	}
 	regArgs.Labels = strings.TrimSpace(regArgs.Labels)
 	if regArgs.Labels != "" {
