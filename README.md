@@ -5,6 +5,8 @@ Actions runner is a runner for Gitea based on [actions/runner](https://github.co
 - This runner doesn't download actions via the git http protocol, it downloads them via tar.gz and zip archives.
 - This runner doesn't support absolute actions in composite actions `https://github.com/actions/checkout@v3` will only work in workflow steps.
 - This runner doesn't support go actions, however you can create a wrapper composite action as a workaround
+- This runner doesn't support the gitea context including `GITEA_` env variables
+- This runner doesn't support expressions and secrets in uses
 - This runner does support service container
 - This runner does support https://github.com/actions/runner-container-hooks
 - This runner uses the official https://github.com/actions/runner runner to run your steps
@@ -16,6 +18,7 @@ Actions runner is a runner for Gitea based on [actions/runner](https://github.co
 - ~~job outputs cannot be sent back https://gitea.com/gitea/actions-proto-def/issues/4~~ fixed
 - Not possible to update display name of steps from runner
   Pre and Post steps are part of setup and complete job, steps not in the job are ignored by the server
+- Not possible to send step updates between cancellation request and finishing the request
 
 ## Prerequisites
 
