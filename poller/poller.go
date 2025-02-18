@@ -193,8 +193,5 @@ func (p *Poller) dispatchTask(ctx context.Context, task *runnerv1.Task) error {
 		}
 	}()
 
-	runCtx, cancel := context.WithTimeout(ctx, time.Hour)
-	defer cancel()
-
-	return p.Dispatch(runCtx, task)
+	return p.Dispatch(ctx, task)
 }
