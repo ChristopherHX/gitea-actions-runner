@@ -20,8 +20,8 @@ import (
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"gitea.com/gitea/act_runner/actions/server"
-	"gitea.com/gitea/act_runner/client"
+	"github.com/ChristopherHX/gitea-actions-runner/actions/server"
+	"github.com/ChristopherHX/gitea-actions-runner/client"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/yaml.v3"
 

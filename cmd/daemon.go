@@ -4,10 +4,10 @@ import (
 	"context"
 	"os"
 
-	"gitea.com/gitea/act_runner/client"
-	"gitea.com/gitea/act_runner/config"
-	"gitea.com/gitea/act_runner/poller"
-	"gitea.com/gitea/act_runner/runtime"
+	"github.com/ChristopherHX/gitea-actions-runner/client"
+	"github.com/ChristopherHX/gitea-actions-runner/config"
+	"github.com/ChristopherHX/gitea-actions-runner/poller"
+	"github.com/ChristopherHX/gitea-actions-runner/runtime"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"github.com/bufbuild/connect-go"

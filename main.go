@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"gitea.com/gitea/act_runner/cmd"
+	"github.com/ChristopherHX/gitea-actions-runner/cmd"
 )
 
 func withContextFunc(ctx context.Context, f func()) context.Context {

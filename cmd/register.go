@@ -13,10 +13,10 @@ import (
 	"time"
 
 	pingv1 "code.gitea.io/actions-proto-go/ping/v1"
-	"gitea.com/gitea/act_runner/client"
-	"gitea.com/gitea/act_runner/config"
-	"gitea.com/gitea/act_runner/register"
-	"gitea.com/gitea/act_runner/util"
+	"github.com/ChristopherHX/gitea-actions-runner/client"
+	"github.com/ChristopherHX/gitea-actions-runner/config"
+	"github.com/ChristopherHX/gitea-actions-runner/register"
+	"github.com/ChristopherHX/gitea-actions-runner/util"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"

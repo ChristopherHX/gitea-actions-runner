@@ -1,13 +1,14 @@
 package client
 
 import (
-	"code.gitea.io/actions-proto-go/ping/v1/pingv1connect"
-	"code.gitea.io/actions-proto-go/runner/v1/runnerv1connect"
 	"context"
-	"gitea.com/gitea/act_runner/core"
-	"github.com/bufbuild/connect-go"
 	"net/http"
 	"strings"
+
+	"code.gitea.io/actions-proto-go/ping/v1/pingv1connect"
+	"code.gitea.io/actions-proto-go/runner/v1/runnerv1connect"
+	"github.com/ChristopherHX/gitea-actions-runner/core"
+	"github.com/bufbuild/connect-go"
 )
 
 // New returns a new runner client.

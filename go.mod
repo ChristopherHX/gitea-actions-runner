@@ -1,4 +1,4 @@
-module gitea.com/gitea/act_runner
+module github.com/ChristopherHX/gitea-actions-runner
 
 go 1.18
 

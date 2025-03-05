@@ -6,7 +6,7 @@ import (
 	"os"
 	"runtime"
 
-	"gitea.com/gitea/act_runner/core"
+	"github.com/ChristopherHX/gitea-actions-runner/core"
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"

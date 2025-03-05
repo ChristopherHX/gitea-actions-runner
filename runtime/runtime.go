@@ -4,7 +4,7 @@ import (
 	"context"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"gitea.com/gitea/act_runner/client"
+	"github.com/ChristopherHX/gitea-actions-runner/client"
 )
 
 // Runner runs the pipeline.

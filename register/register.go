@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"gitea.com/gitea/act_runner/client"
-	"gitea.com/gitea/act_runner/config"
-	"gitea.com/gitea/act_runner/core"
+	"github.com/ChristopherHX/gitea-actions-runner/client"
+	"github.com/ChristopherHX/gitea-actions-runner/config"
+	"github.com/ChristopherHX/gitea-actions-runner/core"
 
 	"github.com/bufbuild/connect-go"
 	log "github.com/sirupsen/logrus"

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"gitea.com/gitea/act_runner/client"
+	"github.com/ChristopherHX/gitea-actions-runner/client"
 
 	"github.com/bufbuild/connect-go"
 	log "github.com/sirupsen/logrus"
@@ -139,13 +139,15 @@ func (p *Poller) Poll(rootctx context.Context) error {
 
 func (p *Poller) pollTask(ctx context.Context) (*runnerv1.Task, error) {
 	l := log.WithField("func", "pollTask")
-	l.Info("poller: request stage from remote server")
-
-	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
 
 	// Load the version value that was in the cache when the request was sent.
 	v := p.tasksVersion.Load()
+
+	//l.Infof("poller: request stage from remote server task version %d", v)
+
+	reqCtx, cancel := context.WithTimeout(ctx, 50*time.Second)
+	defer cancel()
+
 	resp, err := p.Client.FetchTask(reqCtx, connect.NewRequest(&runnerv1.FetchTaskRequest{
 		TasksVersion: v,
 	}))
@@ -175,11 +177,14 @@ func (p *Poller) pollTask(ctx context.Context) (*runnerv1.Task, error) {
 	}
 
 	if resp.Msg.Task == nil || resp.Msg.Task.Id == 0 {
+		l.Infof("poller: no job available task version %d new %d", v, p.tasksVersion.Load())
 		return nil, nil
 	}
 
 	// got a task, set `tasksVersion` to zero to force query db in next request.
-	p.tasksVersion.CompareAndSwap(resp.Msg.TasksVersion, 0)
+	if !p.tasksVersion.CompareAndSwap(resp.Msg.TasksVersion, 0) {
+		l.Warnf("poller: tasksVersion changed from %d to %d", resp.Msg.TasksVersion, p.tasksVersion.Load())
+	}
 
 	return resp.Msg.Task, nil
 }
