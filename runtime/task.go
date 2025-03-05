@@ -199,6 +199,17 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	if exist {
 		return fmt.Errorf("task %d already exists", task.Id)
 	}
+	reportingCtx, reportingCancel := context.WithCancel(context.Background())
+	// allow up to 5 minutes to retry finishing the previous job
+	defer func() {
+		go func() {
+			select {
+			case <-reportingCtx.Done():
+			case <-time.After(5 * time.Minute):
+			}
+			reportingCancel()
+		}()
+	}()
 
 	// set task ve to global map
 	// when task is done or canceled, it will be removed from the map
@@ -315,7 +326,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		if err != nil {
 			taskState.Result = runnerv1.Result_RESULT_FAILURE
 		}
-		return updateTask(ctx, t, taskState, cancel, nil)
+		return updateTask(reportingCtx, t, taskState, cancel, nil)
 	}
 	outputs := map[string]string{}
 	for i := 0; i < len(taskState.Steps); i++ {
@@ -324,16 +335,47 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		}
 	}
 	var logline int64 = 0
+	var sentLogline int64 = 0
+	rows := []*runnerv1.LogRow{}
+	taskStateChanged := false
 
 	go func() {
 		for {
 			var obj interface{}
 			var ok bool
 			nextMsg := false
+
+			nextLogSync := time.Hour
+			if len(rows) > 0 && rows[0].Time != nil {
+				nextLogSync = time.Until(rows[0].Time.AsTime().Add(time.Second))
+			}
 			select {
 			case obj, ok = <-aserver.TraceLog:
-			case <-time.After(time.Minute):
-				updateTask(ctx, t, taskState, cancel, nil)
+			case <-time.After(nextLogSync):
+				if taskStateChanged && updateTask(reportingCtx, t, taskState, cancel, nil) == nil {
+					taskStateChanged = false
+				}
+				res, err := t.client.UpdateLog(reportingCtx, connect.NewRequest(&runnerv1.UpdateLogRequest{
+					TaskId: task.GetId(),
+					Index:  sentLogline,
+					Rows:   rows,
+				}))
+				if err == nil {
+					diff := res.Msg.GetAckIndex() - sentLogline
+					sentLogline = res.Msg.GetAckIndex()
+					if diff >= int64(len(rows)) {
+						rows = []*runnerv1.LogRow{}
+					} else if diff > 0 {
+						rows = rows[diff:]
+					}
+				} else {
+					log.Errorf("failed to update log: %v, batching later", err)
+				}
+				nextMsg = true
+			case <-time.After(30 * time.Second):
+				if updateTask(reportingCtx, t, taskState, cancel, nil) == nil {
+					taskStateChanged = false
+				}
 				nextMsg = true
 			}
 			if nextMsg {
@@ -343,8 +385,10 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 				break
 			}
 
-			j, _ := json.MarshalIndent(obj, "", "    ")
-			fmt.Printf("MESSAGE: %s\n", j)
+			if v, ok := os.LookupEnv("GITEA_RUNNER_TRACE"); ok && v == "1" {
+				j, _ := json.MarshalIndent(obj, "", "    ")
+				fmt.Printf("MESSAGE: %s\n", j)
+			}
 
 			if feed, ok := obj.(*protocol.TimelineRecordFeedLinesWrapper); ok {
 				loglineStart := logline
@@ -369,28 +413,19 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					step.LogIndex = loglineStart
 				}
 				now := timestamppb.Now()
-				rows := []*runnerv1.LogRow{}
 				for _, row := range feed.Value {
 					rows = append(rows, &runnerv1.LogRow{
 						Time:    now,
 						Content: row,
 					})
 				}
-				res, err := t.client.UpdateLog(ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
-					TaskId: task.GetId(),
-					Index:  loglineStart,
-					Rows:   rows,
-				}))
-				if err == nil {
-					logline = res.Msg.GetAckIndex()
-				}
+
 				if step.StepIndex != -1 {
 					stepIndex = step.StepIndex
 					taskState.Steps[stepIndex].LogIndex = step.LogIndex
 					taskState.Steps[stepIndex].LogLength = step.LogLength
 				}
-				// The cancel request message is hidden in the implementation depth of the act_runner
-				updateTask(ctx, t, taskState, cancel, nil)
+				taskStateChanged = true
 			} else if timeline, ok := obj.(*protocol.TimelineRecordWrapper); ok {
 				for _, rec := range timeline.Value {
 					step, ok := stepMeta[rec.ID]
@@ -437,6 +472,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 						}
 					}
 				}
+				taskStateChanged = true
 			} else if jevent, ok := obj.(*protocol.JobEvent); ok {
 				if jevent.Result != "" {
 					switch strings.ToLower(jevent.Result) {
@@ -470,17 +506,34 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		if errormsg != nil {
 			message = fmt.Sprintf("##[Error]%s", errormsg.Error())
 		}
-		t.client.UpdateLog(ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
-			TaskId: task.GetId(),
-			Index:  logline,
-			Rows: []*runnerv1.LogRow{
-				{
-					Time:    timestamppb.New(time.Now()),
-					Content: message,
-				},
-			},
-			NoMore: true,
-		}))
+		rows = append(rows, &runnerv1.LogRow{
+			Time:    timestamppb.New(time.Now()),
+			Content: message,
+		})
+
+		retry.Do(func() error {
+			res, err := t.client.UpdateLog(reportingCtx, connect.NewRequest(&runnerv1.UpdateLogRequest{
+				TaskId: task.GetId(),
+				Index:  logline,
+				Rows:   rows,
+				NoMore: true,
+			}))
+			if err == nil {
+				diff := res.Msg.GetAckIndex() - sentLogline
+				sentLogline = res.Msg.GetAckIndex()
+				if diff >= int64(len(rows)) {
+					rows = []*runnerv1.LogRow{}
+				} else if diff > 0 {
+					rows = rows[diff:]
+				}
+				if len(rows) > 0 {
+					return fmt.Errorf("still logs missing")
+				}
+			} else {
+				log.Errorf("failed to update log: %v, batching later", err)
+			}
+			return err
+		}, retry.Context(reportingCtx))
 
 		if taskState.Result == runnerv1.Result_RESULT_UNSPECIFIED {
 			taskState.Result = runnerv1.Result_RESULT_FAILURE
@@ -748,6 +801,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	if token == "" {
 		token = preset.Token
 	}
+
 	jmessage := &protocol.AgentJobRequestMessage{
 		MessageType: "jobRequest",
 		Plan: &protocol.TaskOrchestrationPlanReference{
@@ -865,7 +919,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 				Content: line,
 			})
 		}
-		res, err := t.client.UpdateLog(ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
+		res, err := t.client.UpdateLog(reportingCtx, connect.NewRequest(&runnerv1.UpdateLogRequest{
 			TaskId: task.GetId(),
 			Index:  logline,
 			Rows:   loglines,
