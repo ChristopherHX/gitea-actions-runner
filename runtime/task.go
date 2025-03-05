@@ -339,6 +339,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	rows := []*runnerv1.LogRow{}
 	taskStateChanged := false
 
+	var worker *exec.Cmd
+
 	go func() {
 		for {
 			var obj interface{}
@@ -483,7 +485,21 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					default:
 						taskState.Result = runnerv1.Result_RESULT_FAILURE
 					}
+				} else {
+					taskState.Result = runnerv1.Result_RESULT_FAILURE
 				}
+
+				// See https://github.com/ChristopherHX/gitea-actions-runner/issues/27
+				go func() {
+					select {
+					case <-reportingCtx.Done():
+						// process exited
+					case <-time.After(30 * time.Second):
+						if worker != nil && worker.Process != nil && worker.ProcessState == nil {
+							worker.Process.Kill()
+						}
+					}
+				}()
 				if jevent.Outputs != nil {
 					for k, v := range *jevent.Outputs {
 						outputs[k] = v.Value
@@ -867,7 +883,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	src, _ := json.Marshal(jmessage)
 	jobExecCtx := ctx
 
-	worker := exec.CommandContext(context.Background(), runnerWorker[0], runnerWorker[1:]...)
+	worker = exec.CommandContext(reportingCtx, runnerWorker[0], runnerWorker[1:]...)
 	// ignore CTRL+C
 	worker.SysProcAttr = getSysProcAttr()
 	in, err := worker.StdinPipe()
