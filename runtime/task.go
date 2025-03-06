@@ -883,21 +883,24 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	src, _ := json.Marshal(jmessage)
 	jobExecCtx := ctx
 
-	worker = exec.CommandContext(reportingCtx, runnerWorker[0], runnerWorker[1:]...)
+	worker = exec.Command(runnerWorker[0], runnerWorker[1:]...)
 	// ignore CTRL+C
 	worker.SysProcAttr = getSysProcAttr()
 	in, err := worker.StdinPipe()
 	if err != nil {
 		return err
 	}
+	defer in.Close()
 	er, err := worker.StderrPipe()
 	if err != nil {
 		return err
 	}
+	defer er.Close()
 	out, err := worker.StdoutPipe()
 	if err != nil {
 		return err
 	}
+	defer out.Close()
 	err = worker.Start()
 	if err != nil {
 		return err
