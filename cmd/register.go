@@ -207,6 +207,9 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 	return StageUnknown
 }
 
+const actionsRunnerVersion string = "2.322.0"
+const runnerServerRunnerVersion string = "3.13.3"
+
 func (r *registerInputs) setupRunner() registerStage {
 	d := util.DownloadRunner
 	if r.RunnerType == 2 {
@@ -214,9 +217,9 @@ func (r *registerInputs) setupRunner() registerStage {
 	}
 	if r.RunnerVersion == "" {
 		if r.RunnerType == 1 {
-			r.RunnerVersion = "2.322.0"
+			r.RunnerVersion = actionsRunnerVersion
 		} else {
-			r.RunnerVersion = "3.13.2"
+			r.RunnerVersion = runnerServerRunnerVersion
 		}
 	}
 	wd, _ := os.Getwd()
@@ -330,7 +333,7 @@ func printStageHelp(stage registerStage) {
 		}
 		log.Infof("Enter the worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker%s:\n", suffix)
 	case StageInputRunnerVersion:
-		log.Infoln("Specify the version of the runner? (for example, 3.12.1):")
+		log.Infof("Specify the version of the runner? (for example %s or %s):\n", actionsRunnerVersion, runnerServerRunnerVersion)
 	case StageInputInstance:
 		log.Infoln("Enter the Gitea instance URL (for example, https://gitea.com/):")
 	case StageInputToken:
