@@ -299,6 +299,13 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			Outputs: v.GetOutputs(),
 		}
 	}
+	myenv := map[string]string{}
+	for k, v := range workflow.Env {
+		myenv[k] = v
+	}
+	for k, v := range job.Environment() {
+		myenv[k] = v
+	}
 	inputs := getSubkeyMap(task.GetContext(), "event", "inputs")
 	intp := exprparser.NewInterpeter(&exprparser.EvaluationEnvironment{
 		Github:  preset,
@@ -306,6 +313,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		Vars:    task.GetVars(),
 		Secrets: task.GetSecrets(),
 		Inputs:  inputs,
+		Env:     myenv,
 	}, exprparser.Config{
 		Run: &model.Run{
 			Workflow: workflow,
