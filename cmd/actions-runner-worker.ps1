@@ -13,11 +13,27 @@ if(-not (Test-Path $runnerFile))  {
 $stdin = [System.Console]::OpenStandardInput()
 $pipeOut = New-Object -TypeName System.IO.Pipes.AnonymousPipeServerStream -ArgumentList 'Out','Inheritable'
 $pipeIn = New-Object -TypeName System.IO.Pipes.AnonymousPipeServerStream -ArgumentList 'In','Inheritable'
+$startInfo = New-Object System.Diagnostics.ProcessStartInfo
 if($Worker.EndsWith(".dll")) {
-    $proc = Start-Process -NoNewWindow -PassThru -FilePath dotnet -ArgumentList $Worker,spawnclient,$pipeOut.GetClientHandleAsString(),$pipeIn.GetClientHandleAsString()
+    $startInfo.FileName = $Worker
+    $startInfo.Arguments = "`"$Worker`" spawnclient $($pipeOut.GetClientHandleAsString()) $($pipeIn.GetClientHandleAsString())"
 } else {
-    $proc = Start-Process -NoNewWindow -PassThru -FilePath $Worker -ArgumentList spawnclient,$pipeOut.GetClientHandleAsString(),$pipeIn.GetClientHandleAsString()
+    $startInfo.FileName = $Worker
+    $startInfo.Arguments = "spawnclient $($pipeOut.GetClientHandleAsString()) $($pipeIn.GetClientHandleAsString())"
 }
+$startInfo.UseShellExecute = $false
+$startInfo.RedirectStandardInput = $true
+$startInfo.RedirectStandardOutput = $true
+$startInfo.RedirectStandardError = $true
+
+$process = New-Object System.Diagnostics.Process
+$process.StartInfo = $startInfo
+
+# Set the process creation flags to CREATE_NEW_PROCESS_GROUP (0x200)
+$processCreationFlags = 0x200
+$process.StartInfo.CreateNoWindow = $true
+$process.Start()
+$proc = $process
 $inputjob = Start-ThreadJob -ScriptBlock {
     $stdin = $using:stdin
     $pipeOut = $using:pipeOut
