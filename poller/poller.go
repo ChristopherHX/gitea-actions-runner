@@ -58,23 +58,27 @@ func (p *Poller) schedule() {
 
 func (p *Poller) Wait() {
 	p.routineGroup.Wait()
+	defer log.Infof("wait: exit")
 }
 
 func (p *Poller) Poll(rootctx context.Context) error {
+	defer log.Infof("Poll: exit %v", recover())
+
 	ctx, cancel := context.WithCancel(rootctx)
 	defer cancel()
 
 	// this is needed to not force cancel the job by parent context
 	jobCtx, hardCancel := context.WithCancel(context.Background())
-	defer func() {
-		p.Wait()
-		hardCancel()
-	}()
-
 	// trap Ctrl+C to control graceful exit of running jobs
 	channel := make(chan os.Signal, 1)
 	signal.Notify(channel, syscall.SIGTERM, os.Interrupt)
-	defer signal.Stop(channel)
+
+	defer func() {
+		p.Wait()
+		hardCancel()
+		signal.Stop(channel)
+		close(channel)
+	}()
 
 	go func() {
 		sig, ok := <-channel
@@ -99,6 +103,7 @@ func (p *Poller) Poll(rootctx context.Context) error {
 		// wait worker ready
 		case <-p.ready:
 		case <-ctx.Done():
+			log.Infof("Poll: exit -1")
 			return nil
 		}
 	LOOP:
@@ -125,10 +130,13 @@ func (p *Poller) Poll(rootctx context.Context) error {
 					defer p.schedule()
 					defer p.metric.DecBusyWorker()
 					if p.Once {
+						defer l.Infof("execute task: once")
 						defer cancel()
 					}
 					if err := p.dispatchTask(jobCtx, task); err != nil {
 						l.Errorf("execute task: %v", err.Error())
+					} else {
+						l.Infof("execute task: ok")
 					}
 				})
 				break LOOP

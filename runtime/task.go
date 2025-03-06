@@ -195,6 +195,7 @@ func rewriteSubExpression(in string, forceFormat bool) (string, bool) {
 func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []string) (errormsg error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
 	_, exist := globalTaskMap.Load(task.Id)
 	if exist {
 		return fmt.Errorf("task %d already exists", task.Id)
@@ -519,6 +520,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	defer func() {
 		httpServer.Shutdown(context.Background())
 		message := "Finished"
+		log.Info(message)
 		if errormsg != nil {
 			message = fmt.Sprintf("##[Error]%s", errormsg.Error())
 		}
@@ -555,7 +557,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			taskState.Result = runnerv1.Result_RESULT_FAILURE
 		}
 		taskState.StoppedAt = timestamppb.Now()
-		updateTask(ctx, t, taskState, cancel, outputs)
+		updateTask(reportingCtx, t, taskState, cancel, outputs)
+		log.Info("Reporting done")
 	}()
 
 	ip := common.GetOutboundIP()
