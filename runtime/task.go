@@ -307,6 +307,17 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		myenv[k] = v
 	}
 	inputs := getSubkeyMap(task.GetContext(), "event", "inputs")
+	// Restore boolean type from string
+	dispatchConfig := workflow.WorkflowDispatchConfig()
+	if dispatchConfig != nil {
+		for k, v := range dispatchConfig.Inputs {
+			if v.Type == "boolean" {
+				if val, ok := inputs[k]; ok {
+					inputs[k] = val == "true"
+				}
+			}
+		}
+	}
 	intp := exprparser.NewInterpeter(&exprparser.EvaluationEnvironment{
 		Github:  preset,
 		Needs:   needs,
