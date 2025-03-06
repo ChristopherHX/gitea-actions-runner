@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -22,6 +23,7 @@ import (
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"github.com/ChristopherHX/gitea-actions-runner/actions/server"
 	"github.com/ChristopherHX/gitea-actions-runner/client"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/yaml.v3"
 
@@ -192,6 +194,22 @@ func rewriteSubExpression(in string, forceFormat bool) (string, bool) {
 	return out, true
 }
 
+func getSubkeyMap(structVal *structpb.Struct, keys ...string) map[string]interface{} {
+	currentVal := structVal
+	for _, key := range keys {
+		if value, exists := currentVal.Fields[key]; exists {
+			if structValue := value.GetStructValue(); structValue != nil {
+				currentVal = structValue
+			} else {
+				return nil
+			}
+		} else {
+			return nil
+		}
+	}
+	return currentVal.AsMap()
+}
+
 func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []string) (errormsg error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -281,10 +299,13 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			Outputs: v.GetOutputs(),
 		}
 	}
+	inputs := getSubkeyMap(task.GetContext(), "event", "inputs")
 	intp := exprparser.NewInterpeter(&exprparser.EvaluationEnvironment{
-		Github: preset,
-		Needs:  needs,
-		Vars:   task.GetVars(),
+		Github:  preset,
+		Needs:   needs,
+		Vars:    task.GetVars(),
+		Secrets: task.GetSecrets(),
+		Inputs:  inputs,
 	}, exprparser.Config{
 		Run: &model.Run{
 			Workflow: workflow,
@@ -306,6 +327,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		TraceLog:         make(chan interface{}),
 		ServerUrl:        dataContext["server_url"].GetStringValue(),
 		ActionsServerUrl: dataContext["gitea_default_actions_url"].GetStringValue(),
+		AuthData:         map[string]*protocol.ActionDownloadAuthentication{},
 	}
 	defer func() {
 		close(aserver.TraceLog)
@@ -622,6 +644,16 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			}
 		} else {
 			uses := s.Uses
+			// For Gitea Actions allows expressions in uses
+			if expression, isExpr := rewriteSubExpression(uses, true); isExpr {
+				ruses, err := intp.Evaluate(expression, exprparser.DefaultStatusCheckNone)
+				if err == nil {
+					suses, ok := ruses.(string)
+					if ok {
+						uses = suses
+					}
+				}
+			}
 			if strings.HasPrefix(uses, "docker://") {
 				reference = protocol.ActionStepDefinitionReference{
 					Type:  "containerRegistry",
@@ -631,9 +663,25 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 				nameAndPathOrRef := strings.Split(uses, "@")
 				nameAndPath := strings.Split(nameAndPathOrRef[0], "/")
 				for _, proto := range []string{"http://", "https://"} {
+					var token string
+					if len(nameAndPathOrRef) == 3 {
+						actionURL := nameAndPathOrRef[0] + "@" + nameAndPathOrRef[1]
+						if pURL, err := url.Parse(actionURL); err == nil && pURL.User != nil {
+							var ok bool
+							if token, ok = pURL.User.Password(); ok {
+								pURL.User = nil
+								actionURL = pURL.String()
+							}
+						}
+						nameAndPathOrRef = []string{actionURL, nameAndPathOrRef[2]}
+					}
+
 					if strings.HasPrefix(nameAndPathOrRef[0], proto) {
 						re := strings.Split(strings.TrimPrefix(nameAndPathOrRef[0], proto), "/")
 						nameAndPath = append([]string{strings.ReplaceAll(proto+re[0]+"/"+re[1], ":", "~")}, re[2:]...)
+						aserver.AuthData[nameAndPathOrRef[0]] = &protocol.ActionDownloadAuthentication{
+							Token: token,
+						}
 						break
 					}
 				}
@@ -861,7 +909,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			"github":   server.ToPipelineContextData(github),
 			"matrix":   server.ToPipelineContextData(matrix),
 			"strategy": server.ToPipelineContextData(map[string]interface{}{}),
-			"inputs":   server.ToPipelineContextData(map[string]interface{}{}),
+			"inputs":   server.ToPipelineContextData(inputs),
 			"needs":    server.ToPipelineContextData(needsctx),
 			"vars":     server.ToPipelineContextData(convertToRawMap(task.GetVars())),
 		},
@@ -879,6 +927,12 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	jmessage.Variables["DistributedTask.DeprecateStepOutputCommands"] = protocol.VariableValue{Value: "true"}
 	jmessage.Variables["DistributedTask.ForceGithubJavascriptActionsToNode16"] = protocol.VariableValue{Value: "true"}
 	jmessage.Variables["system.github.job"] = protocol.VariableValue{Value: job.Name}
+	// For Gitea Actions
+	jmessage.Variables["system.runner.server.webconsole_queue_all"] = protocol.VariableValue{Value: "true"}
+	jmessage.Variables["system.runner.server.github_prefixes"] = protocol.VariableValue{Value: "github,gitea"}
+	jmessage.Variables["system.runner.server.go_actions"] = protocol.VariableValue{Value: "true"}
+	jmessage.Variables["system.runner.server.absolute_actions"] = protocol.VariableValue{Value: "true"}
+	jmessage.Variables["system.runner.server.allow_dind"] = protocol.VariableValue{Value: "true"}
 	for k, v := range task.Secrets {
 		jmessage.Variables[k] = protocol.VariableValue{Value: v, IsSecret: true}
 	}

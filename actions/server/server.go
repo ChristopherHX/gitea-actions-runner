@@ -15,6 +15,7 @@ type ActionsServer struct {
 	TraceLog         chan interface{}
 	ServerUrl        string
 	ActionsServerUrl string
+	AuthData         map[string]*protocol.ActionDownloadAuthentication
 }
 
 func ToPipelineContextDataWithError(data interface{}) (protocol.PipelineContextData, error) {
@@ -139,8 +140,23 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 				if strings.HasPrefix(ref.NameWithOwner, proto) {
 					absolute = true
 					noAuth = true
-					resolved.TarballUrl = fmt.Sprintf("%s/archive/%s.tar.gz", strings.ReplaceAll(ref.NameWithOwner, "~", ":"), ref.Ref)
-					resolved.ZipballUrl = fmt.Sprintf("%s/archive/%s.zip", strings.ReplaceAll(ref.NameWithOwner, "~", ":"), ref.Ref)
+					originalNameOwner := strings.ReplaceAll(ref.NameWithOwner, "~", ":")
+					if authData, ok := server.AuthData[originalNameOwner]; ok {
+						resolved.Authentication = authData
+						noAuth = false
+					}
+					pURL, _ := url.Parse(originalNameOwner)
+					p := pURL.Path
+					pURL.Path = ""
+					host := pURL.String()
+					if host == "https://github.com" || noAuth {
+						resolved.TarballUrl = fmt.Sprintf("%s/archive/%s.tar.gz", originalNameOwner, ref.Ref)
+						resolved.ZipballUrl = fmt.Sprintf("%s/archive/%s.zip", originalNameOwner, ref.Ref)
+					} else {
+						// Gitea does not support auth on the web route
+						resolved.TarballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.tar.gz", host, p, ref.Ref)
+						resolved.ZipballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.zip", host, p, ref.Ref)
+					}
 					break
 				}
 			}
@@ -152,9 +168,14 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 					urls = []string{server.ActionsServerUrl}
 				}
 				for _, url := range urls {
-					resolved.TarballUrl = fmt.Sprintf("%s/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
-					resolved.ZipballUrl = fmt.Sprintf("%s/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
 					noAuth = url != server.ServerUrl
+					if noAuth {
+						resolved.TarballUrl = fmt.Sprintf("%s/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+						resolved.ZipballUrl = fmt.Sprintf("%s/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+					} else {
+						resolved.TarballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+						resolved.ZipballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+					}
 					if resp, err := http.Head(resolved.TarballUrl); err == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
 						break
 					}
