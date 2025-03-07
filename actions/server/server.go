@@ -115,7 +115,8 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		jsonRequest(recs)
 		resp.WriteHeader(200)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/Logfiles") {
-		if strings.Count(req.URL.Path, "/") == 7 {
+		logPath := "/_apis/v1/Logfiles/"
+		if strings.HasPrefix(req.URL.Path, logPath) && len(logPath) < len(req.URL.Path) {
 			io.Copy(io.Discard, req.Body)
 			resp.WriteHeader(200)
 		} else {
