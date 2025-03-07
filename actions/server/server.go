@@ -116,10 +116,18 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		resp.WriteHeader(200)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/Logfiles") {
 		if strings.Count(req.URL.Path, "/") == 7 {
-			req.Body.Close()
+			io.Copy(io.Discard, req.Body)
 			resp.WriteHeader(200)
 		} else {
-			recs := &protocol.TaskLog{}
+			p := "logs\\0.log"
+			recs := &protocol.TaskLog{
+				TaskLogReference: protocol.TaskLogReference{
+					ID: 1,
+				},
+				CreatedOn:     "2022-01-01T00:00:00",
+				LastChangedOn: "2022-01-01T00:00:00",
+				Path:          &p,
+			}
 			jsonRequest(recs)
 			jsonResponse(recs)
 		}
