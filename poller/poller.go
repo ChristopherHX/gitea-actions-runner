@@ -13,7 +13,7 @@ import (
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"github.com/ChristopherHX/gitea-actions-runner/client"
 
-	"github.com/bufbuild/connect-go"
+	"connectrpc.com/connect"
 	log "github.com/sirupsen/logrus"
 )
 

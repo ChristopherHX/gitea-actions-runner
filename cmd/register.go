@@ -18,7 +18,7 @@ import (
 	"github.com/ChristopherHX/gitea-actions-runner/register"
 	"github.com/ChristopherHX/gitea-actions-runner/util"
 
-	"github.com/bufbuild/connect-go"
+	"connectrpc.com/connect"
 	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"

@@ -27,8 +27,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/yaml.v3"
 
+	"connectrpc.com/connect"
 	"github.com/ChristopherHX/github-act-runner/protocol"
-	"github.com/bufbuild/connect-go"
 	"github.com/google/uuid"
 	"github.com/nektos/act/pkg/artifactcache"
 	"github.com/nektos/act/pkg/common"

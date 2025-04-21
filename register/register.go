@@ -11,7 +11,7 @@ import (
 	"github.com/ChristopherHX/gitea-actions-runner/config"
 	"github.com/ChristopherHX/gitea-actions-runner/core"
 
-	"github.com/bufbuild/connect-go"
+	"connectrpc.com/connect"
 	log "github.com/sirupsen/logrus"
 )
 
