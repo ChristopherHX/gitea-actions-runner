@@ -207,7 +207,7 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 	return StageUnknown
 }
 
-const actionsRunnerVersion string = "2.322.0"
+const actionsRunnerVersion string = "2.323.0"
 const runnerServerRunnerVersion string = "3.13.3"
 
 func (r *registerInputs) setupRunner() registerStage {
