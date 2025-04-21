@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/ChristopherHX/gitea-actions-runner/exec"
 	"github.com/joho/godotenv"
 	"github.com/kardianos/service"
 	"github.com/spf13/cobra"
@@ -205,6 +206,30 @@ func Execute(ctx context.Context) {
 	}
 	cmdSvc.AddCommand(svcInstall, svcStart, svcStop, svcRun, svcUninstall)
 	rootCmd.AddCommand(cmdSvc)
+
+	filePath := ""
+	workerArgs := []string{}
+	contextPath := ""
+	varsPath := ""
+	secretsPath := ""
+	cmdExec := &cobra.Command{
+		Use:   "exec",
+		Short: "Run a command in the runner environment",
+		Args:  cobra.MaximumNArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			content, _ := os.ReadFile(filePath)
+			contentData, _ := os.ReadFile(contextPath)
+			varsData, _ := os.ReadFile(varsPath)
+			secretsData, _ := os.ReadFile(secretsPath)
+			return exec.Exec(string(content), string(contentData), string(varsData), string(secretsData), workerArgs)
+		},
+	}
+	cmdExec.Flags().StringVar(&filePath, "file", "", "Read in a workflow file with a single job.")
+	cmdExec.Flags().StringVar(&contextPath, "context", "", "Read in a context file.")
+	cmdExec.Flags().StringVar(&varsPath, "vars-file", "", "Read in a context file.")
+	cmdExec.Flags().StringVar(&secretsPath, "secrets-file", "", "Read in a context file.")
+	cmdExec.Flags().StringArrayVar(&workerArgs, "worker", []string{}, "worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker")
+	rootCmd.AddCommand(cmdExec)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
