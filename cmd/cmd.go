@@ -221,7 +221,7 @@ func Execute(ctx context.Context) {
 			contentData, _ := os.ReadFile(contextPath)
 			varsData, _ := os.ReadFile(varsPath)
 			secretsData, _ := os.ReadFile(secretsPath)
-			return exec.Exec(string(content), string(contentData), string(varsData), string(secretsData), workerArgs)
+			return exec.Exec(ctx, string(content), string(contentData), string(varsData), string(secretsData), workerArgs)
 		},
 	}
 	cmdExec.Flags().StringVar(&filePath, "file", "", "Read in a workflow file with a single job.")

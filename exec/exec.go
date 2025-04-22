@@ -73,7 +73,7 @@ func (m *mockClient) UpdateTask(_ context.Context, req *connect.Request[runnerv1
 	}), nil
 }
 
-func Exec(content, contextData, varsData, secretsData string, args []string) error {
+func Exec(ctx context.Context, content, contextData, varsData, secretsData string, args []string) error {
 	mapData := make(map[string]any)
 	yaml.Unmarshal([]byte(contextData), &mapData)
 	if len(mapData) == 0 {
@@ -92,7 +92,7 @@ func Exec(content, contextData, varsData, secretsData string, args []string) err
 
 	pContext, _ := structpb.NewStruct(mapData)
 	task := runtime.NewTask("gitea", 0, &mockClient{}, nil, nil)
-	return task.Run(context.Background(), &runnerv1.Task{
+	return task.Run(ctx, &runnerv1.Task{
 		Id:              1,
 		WorkflowPayload: []byte(content),
 		Context:         pContext,
