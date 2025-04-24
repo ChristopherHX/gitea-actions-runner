@@ -556,10 +556,21 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		return err
 	}
 
-	httpServer := &http.Server{Handler: aserver}
+	var workerV2 bool
+	if len(runnerWorker) > 0 && runnerWorker[0] == "--worker-v2" {
+		runnerWorker = runnerWorker[1:]
+		workerV2 = true
+	}
+
+	var httpServer *http.Server
+	if !workerV2 {
+		httpServer = &http.Server{Handler: aserver}
+	}
 
 	defer func() {
-		httpServer.Shutdown(context.Background())
+		if httpServer != nil {
+			httpServer.Shutdown(context.Background())
+		}
 		message := "Finished"
 		log.Info(message)
 		if errormsg != nil {
@@ -638,9 +649,11 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			defer cache.Close()
 		}
 	}
-	go func() {
-		httpServer.Serve(listener)
-	}()
+	if httpServer != nil {
+		go func() {
+			httpServer.Serve(listener)
+		}()
+	}
 
 	for _, s := range job.Steps {
 		displayName := &protocol.TemplateToken{}
@@ -956,6 +969,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		jmessage.Variables[k] = protocol.VariableValue{Value: v, IsSecret: true}
 	}
 
+	aserver.JobRequest = jmessage
+	aserver.CancelCtx = ctx
 	src, _ := json.Marshal(jmessage)
 	jobExecCtx := ctx
 
@@ -967,11 +982,16 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		return err
 	}
 	defer in.Close()
-	er, err := worker.StderrPipe()
-	if err != nil {
-		return err
+	var er io.ReadCloser
+	if workerV2 {
+		worker.Stderr = os.Stderr
+	} else {
+		er, err = worker.StderrPipe()
+		if err != nil {
+			return err
+		}
+		defer er.Close()
 	}
-	defer er.Close()
 	out, err := worker.StdoutPipe()
 	if err != nil {
 		return err
@@ -981,38 +1001,47 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	if err != nil {
 		return err
 	}
-	mid := make([]byte, 4)
-	binary.BigEndian.PutUint32(mid, 1) // NewJobRequest
-	in.Write(mid)
-	binary.BigEndian.PutUint32(mid, uint32(len(src)))
-	in.Write(mid)
-	in.Write(src)
-	done := make(chan struct{})
-	defer close(done)
-	go func() {
-		select {
-		case <-jobExecCtx.Done():
-			binary.BigEndian.PutUint32(mid, 2) // CancelRequest
-			in.Write(mid)
-			binary.BigEndian.PutUint32(mid, uint32(len(src)))
-			in.Write(mid)
-			in.Write(src)
-		case <-done:
-		}
-	}()
-	workerLog := &bytes.Buffer{}
-	workerout := io.MultiWriter(os.Stdout, workerLog)
-	io.Copy(workerout, out)
-	io.Copy(workerout, er)
+	var workerLog *bytes.Buffer
+	if workerV2 {
+		go func() {
+			server.Server(server.CreateStdioConn(out, in), aserver)
+		}()
+	} else {
+		mid := make([]byte, 4)
+		binary.BigEndian.PutUint32(mid, 1) // NewJobRequest
+		in.Write(mid)
+		binary.BigEndian.PutUint32(mid, uint32(len(src)))
+		in.Write(mid)
+		in.Write(src)
+		done := make(chan struct{})
+		defer close(done)
+		go func() {
+			select {
+			case <-jobExecCtx.Done():
+				binary.BigEndian.PutUint32(mid, 2) // CancelRequest
+				in.Write(mid)
+				binary.BigEndian.PutUint32(mid, uint32(len(src)))
+				in.Write(mid)
+				in.Write(src)
+			case <-done:
+			}
+		}()
+		workerLog = &bytes.Buffer{}
+		workerout := io.MultiWriter(os.Stdout, workerLog)
+		io.Copy(workerout, out)
+		io.Copy(workerout, er)
+	}
 	worker.Wait()
 	if exitcode := worker.ProcessState.ExitCode(); exitcode != 0 {
-		workerlogstr := workerLog.String()
 		loglines := []*runnerv1.LogRow{}
-		for _, line := range strings.Split(workerlogstr, "\n") {
-			loglines = append(loglines, &runnerv1.LogRow{
-				Time:    timestamppb.New(time.Now()),
-				Content: line,
-			})
+		if workerLog != nil {
+			workerlogstr := workerLog.String()
+			for _, line := range strings.Split(workerlogstr, "\n") {
+				loglines = append(loglines, &runnerv1.LogRow{
+					Time:    timestamppb.New(time.Now()),
+					Content: line,
+				})
+			}
 		}
 		res, err := t.client.UpdateLog(reportingCtx, connect.NewRequest(&runnerv1.UpdateLogRequest{
 			TaskId: task.GetId(),
