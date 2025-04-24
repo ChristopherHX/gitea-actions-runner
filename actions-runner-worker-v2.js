@@ -54,6 +54,8 @@ const client = http2.connect('http://localhost', {
   sessionTimeout: 60 * 60 * 24 * 7,
 });
 
+const ACTIONS_RUNNER_WORKER_DEBUG = process.env.ACTIONS_RUNNER_WORKER_DEBUG === '1'
+
 const server = http.createServer((req, res) => {
     const creq = client.request({
             ':method': req.method,
@@ -64,7 +66,9 @@ const server = http.createServer((req, res) => {
     req.pipe(creq)
     
     creq.on('response', (headers) => {
-        console.error('Response headers:', headers);
+        if (ACTIONS_RUNNER_WORKER_DEBUG) {
+          console.error('Response headers:', headers);
+        }
         const status = headers[':status'] || 200;
         // Remove HTTP/2 pseudo headers before forwarding.
         const resHeaders = {};
@@ -82,10 +86,12 @@ const server = http.createServer((req, res) => {
         res.writeHead(500);
         res.end('Internal Server Error');
     });
-        
-    creq.on('end', () => {
-        console.error('Response ended.');
-    });
+
+    if (ACTIONS_RUNNER_WORKER_DEBUG) {
+      creq.on('end', () => {
+          console.error('Response ended.');
+      });
+    }
 });
 
 const hostname = process.argv.length > 3 ? process.argv[3] : "localhost";
@@ -131,13 +137,19 @@ server.listen(0, hostname, () => {
   );
   var fchunk = Buffer.alloc(0);
   creq.on('data', (chunk) => {
-    console.error('Response data:', chunk.toString());
-      fchunk = Buffer.concat([fchunk, chunk]);
+    if (ACTIONS_RUNNER_WORKER_DEBUG) {
+      console.error('Response data:', chunk.toString());
+    }
+    fchunk = Buffer.concat([fchunk, chunk]);
   });
   creq.on('end', () => {
-    console.error('Response ended.');
+    if (ACTIONS_RUNNER_WORKER_DEBUG) {
+      console.error('Response ended.');
+    }
     let jobMessage = fchunk.toString();
-    console.error('fchunk:', jobMessage);
+    if (ACTIONS_RUNNER_WORKER_DEBUG) {
+      console.error('fchunk:', jobMessage);
+    }
     let encoded = Buffer.from(jobMessage.toString(), 'utf16le');
     
     // Prepare buffers for the type and encoded-length as 4-byte big-endian integers.
@@ -158,17 +170,25 @@ server.listen(0, hostname, () => {
       );
       var fchunk = Buffer.alloc(0);
       creq.on('data', (chunk) => {
-        console.error('Response data:', chunk.toString());
-          fchunk = Buffer.concat([fchunk, chunk]);
+        if (ACTIONS_RUNNER_WORKER_DEBUG) {
+          console.error('Response data:', chunk.toString());
+        }
+        fchunk = Buffer.concat([fchunk, chunk]);
       });
       creq.on('end', () => {
-        console.error('Response ended.');
-          let jobMessage = fchunk.toString();
+        if (ACTIONS_RUNNER_WORKER_DEBUG) {
+          console.error('Response ended.');
+        }
+        let jobMessage = fchunk.toString();
+        if (ACTIONS_RUNNER_WORKER_DEBUG) {
           console.error('fchunk:', jobMessage);
-          let encoded = Buffer.from("", 'utf16le');
-          
-          if (jobMessage.includes("cancelled")) {
-          console.error('Cancelled');
+        }
+        let encoded = Buffer.from("", 'utf16le');
+        
+        if (jobMessage.includes("cancelled")) {
+          if (ACTIONS_RUNNER_WORKER_DEBUG) {
+            console.error('Cancelled');
+          }
 
           // Prepare buffers for the type and encoded-length as 4-byte big-endian integers.
           const typeBuffer = Buffer.alloc(4);
@@ -180,10 +200,10 @@ server.listen(0, hostname, () => {
           childPipeWrite.write(lengthBuffer);
           childPipeWrite.write(encoded);
 
-        } else {
+        } else if (ACTIONS_RUNNER_WORKER_DEBUG) {
           console.error('Not Cancelled');
         }
-      });    
+      });
     })()
   });
 
