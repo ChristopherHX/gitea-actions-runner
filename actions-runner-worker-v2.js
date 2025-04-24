@@ -88,107 +88,109 @@ const server = http.createServer((req, res) => {
     });
 });
 
-server.listen(4444);
-console.error('Server running at http://localhost:4444/');
+server.listen(0, "localhost", () => {
+  const port = server.address().port;
+  console.error(`Server running at http://localhost:${port}/`);
 
-// Get the worker path from the command line.
-const worker = process.argv[2];
+  // Get the worker path from the command line.
+  const worker = process.argv[2];
 
-// Compute the runner file path (like os.path.abspath(os.path.join(worker, '../../.runner')))
-const runnerFile = path.resolve(worker, '../../.runner');
-if (!fs.existsSync(runnerFile)) {
-  // Create default JSON data
-  const data = {
-    isHostedServer: false,
-    agentName: 'my-runner',
-    workFolder: '_work'
-  };
-  fs.writeFileSync(runnerFile, JSON.stringify(data));
-}
-
-const interpreter = worker.endsWith('.dll') ? ['dotnet'] : [];
-
-var spawnArgs = interpreter.concat([worker, "spawnclient", "3", "4"]);
-const exe = spawnArgs.shift();
-
-const child = child_process.spawn(
-  exe, spawnArgs,
-  {
-    stdio: [process.stdin, process.stdout, process.stderr, 'pipe', 'pipe']
+  // Compute the runner file path (like os.path.abspath(os.path.join(worker, '../../.runner')))
+  const runnerFile = path.resolve(worker, '../../.runner');
+  if (!fs.existsSync(runnerFile)) {
+    // Create default JSON data
+    const data = {
+      isHostedServer: false,
+      agentName: 'my-runner',
+      workFolder: '_work'
+    };
+    fs.writeFileSync(runnerFile, JSON.stringify(data));
   }
-);
 
-const childPipeWrite = child.stdio[3];
-const childPipeRead = child.stdio[4];
+  const interpreter = worker.endsWith('.dll') ? ['dotnet'] : [];
 
-const creq = client.request({
-    ':method': "GET",
-    ':path': "/JobRequest?SYSTEMVSSCONNECTION=" + encodeURIComponent("http://localhost:4444/")
-}
-);
-var fchunk = Buffer.alloc(0);
-creq.on('data', (chunk) => {
-  console.error('Response data:', chunk.toString());
-    fchunk = Buffer.concat([fchunk, chunk]);
-});
-creq.on('end', () => {
-  console.error('Response ended.');
-  let jobMessage = fchunk.toString();
-  console.error('fchunk:', jobMessage);
-  let encoded = Buffer.from(jobMessage.toString(), 'utf16le');
-  
-  // Prepare buffers for the type and encoded-length as 4-byte big-endian integers.
-  const typeBuffer = Buffer.alloc(4);
-  typeBuffer.writeUint32LE(1, 0);
-  const lengthBuffer = Buffer.alloc(4);
-  lengthBuffer.writeUint32LE(encoded.length, 0);
+  var spawnArgs = interpreter.concat([worker, "spawnclient", "3", "4"]);
+  const exe = spawnArgs.shift();
 
-  childPipeWrite.write(typeBuffer);
-  childPipeWrite.write(lengthBuffer);
-  childPipeWrite.write(encoded);
-
-  (() => {
-    const creq = client.request({
-      ':method': "GET",
-      ':path': "/WaitForCancellation"
+  const child = child_process.spawn(
+    exe, spawnArgs,
+    {
+      stdio: [process.stdin, process.stdout, process.stderr, 'pipe', 'pipe']
     }
-    );
-    var fchunk = Buffer.alloc(0);
-    creq.on('data', (chunk) => {
-      console.error('Response data:', chunk.toString());
-        fchunk = Buffer.concat([fchunk, chunk]);
-    });
-    creq.on('end', () => {
-      console.error('Response ended.');
-        let jobMessage = fchunk.toString();
-        console.error('fchunk:', jobMessage);
-        let encoded = Buffer.from("", 'utf16le');
-        
-        if (jobMessage.includes("cancelled")) {
-        console.error('Cancelled');
+  );
 
-        // Prepare buffers for the type and encoded-length as 4-byte big-endian integers.
-        const typeBuffer = Buffer.alloc(4);
-        typeBuffer.writeUint32LE(2, 0);
-        const lengthBuffer = Buffer.alloc(4);
-        lengthBuffer.writeUint32LE(encoded.length, 0);
-        
-        childPipeWrite.write(typeBuffer);
-        childPipeWrite.write(lengthBuffer);
-        childPipeWrite.write(encoded);
+  const childPipeWrite = child.stdio[3];
+  const childPipeRead = child.stdio[4];
 
-      } else {
-        console.error('Not Cancelled');
-      }
-    });    
-  })()
-});
-
-child.on('exit', (code) => {
-  console.error(`Child exited with code ${code}`);
-  if (code >= 100 && code <= 105) {
-    process.exit(0);
-  } else {
-    process.exit(1);
+  const creq = client.request({
+      ':method': "GET",
+      ':path': "/JobRequest?SYSTEMVSSCONNECTION=" + encodeURIComponent("http://localhost:" + port + "/"),
   }
+  );
+  var fchunk = Buffer.alloc(0);
+  creq.on('data', (chunk) => {
+    console.error('Response data:', chunk.toString());
+      fchunk = Buffer.concat([fchunk, chunk]);
+  });
+  creq.on('end', () => {
+    console.error('Response ended.');
+    let jobMessage = fchunk.toString();
+    console.error('fchunk:', jobMessage);
+    let encoded = Buffer.from(jobMessage.toString(), 'utf16le');
+    
+    // Prepare buffers for the type and encoded-length as 4-byte big-endian integers.
+    const typeBuffer = Buffer.alloc(4);
+    typeBuffer.writeUint32LE(1, 0);
+    const lengthBuffer = Buffer.alloc(4);
+    lengthBuffer.writeUint32LE(encoded.length, 0);
+
+    childPipeWrite.write(typeBuffer);
+    childPipeWrite.write(lengthBuffer);
+    childPipeWrite.write(encoded);
+
+    (() => {
+      const creq = client.request({
+        ':method': "GET",
+        ':path': "/WaitForCancellation"
+      }
+      );
+      var fchunk = Buffer.alloc(0);
+      creq.on('data', (chunk) => {
+        console.error('Response data:', chunk.toString());
+          fchunk = Buffer.concat([fchunk, chunk]);
+      });
+      creq.on('end', () => {
+        console.error('Response ended.');
+          let jobMessage = fchunk.toString();
+          console.error('fchunk:', jobMessage);
+          let encoded = Buffer.from("", 'utf16le');
+          
+          if (jobMessage.includes("cancelled")) {
+          console.error('Cancelled');
+
+          // Prepare buffers for the type and encoded-length as 4-byte big-endian integers.
+          const typeBuffer = Buffer.alloc(4);
+          typeBuffer.writeUint32LE(2, 0);
+          const lengthBuffer = Buffer.alloc(4);
+          lengthBuffer.writeUint32LE(encoded.length, 0);
+          
+          childPipeWrite.write(typeBuffer);
+          childPipeWrite.write(lengthBuffer);
+          childPipeWrite.write(encoded);
+
+        } else {
+          console.error('Not Cancelled');
+        }
+      });    
+    })()
+  });
+
+  child.on('exit', (code) => {
+    console.error(`Child exited with code ${code}`);
+    if (code >= 100 && code <= 105) {
+      process.exit(0);
+    } else {
+      process.exit(1);
+    }
+  });
 });
