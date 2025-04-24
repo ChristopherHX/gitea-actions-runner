@@ -1,4 +1,5 @@
-// 
+// Experimental --worker-v2 script
+// Use --worker-v2,node,actions-runner-worker-v2.js,/path/to/Runner.Worker
 
 const fs = require('fs');
 const path = require('path');
