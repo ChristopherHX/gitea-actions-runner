@@ -228,7 +228,7 @@ func Execute(ctx context.Context) {
 	cmdExec.Flags().StringVar(&contextPath, "context", "", "Read in a context file.")
 	cmdExec.Flags().StringVar(&varsPath, "vars-file", "", "Read in a context file.")
 	cmdExec.Flags().StringVar(&secretsPath, "secrets-file", "", "Read in a context file.")
-	cmdExec.Flags().StringArrayVar(&workerArgs, "worker", []string{}, "worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker")
+	cmdExec.Flags().StringSliceVar(&workerArgs, "worker", []string{}, "worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker")
 	rootCmd.AddCommand(cmdExec)
 
 	if err := rootCmd.Execute(); err != nil {
