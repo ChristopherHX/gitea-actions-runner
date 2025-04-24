@@ -88,9 +88,11 @@ const server = http.createServer((req, res) => {
     });
 });
 
-server.listen(0, "localhost", () => {
+const hostname = process.argv.length > 3 ? process.argv[3] : "localhost";
+
+server.listen(0, hostname, () => {
   const port = server.address().port;
-  console.error(`Server running at http://localhost:${port}/`);
+  console.error(`Server running at http://${hostname}:${port}/`);
 
   // Get the worker path from the command line.
   const worker = process.argv[2];
@@ -124,7 +126,7 @@ server.listen(0, "localhost", () => {
 
   const creq = client.request({
       ':method': "GET",
-      ':path': "/JobRequest?SYSTEMVSSCONNECTION=" + encodeURIComponent("http://localhost:" + port + "/"),
+      ':path': "/JobRequest?SYSTEMVSSCONNECTION=" + encodeURIComponent(`http://${hostname}:${port}/`),
   }
   );
   var fchunk = Buffer.alloc(0);
