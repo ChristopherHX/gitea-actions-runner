@@ -1,12 +1,14 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ChristopherHX/github-act-runner/protocol"
 )
@@ -16,6 +18,8 @@ type ActionsServer struct {
 	ServerUrl        string
 	ActionsServerUrl string
 	AuthData         map[string]*protocol.ActionDownloadAuthentication
+	JobRequest       *protocol.AgentJobRequestMessage
+	CancelCtx        context.Context
 }
 
 func ToPipelineContextDataWithError(data interface{}) (protocol.PipelineContextData, error) {
@@ -256,6 +260,43 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		}
 		resp.WriteHeader(rsp.StatusCode)
 		io.Copy(resp, rsp.Body)
+	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/ActionDownload") {
+		resp.WriteHeader(404)
+	} else if strings.HasPrefix(req.URL.Path, "/JobRequest") {
+		SYSTEMVSSCONNECTION := req.URL.Query().Get("SYSTEMVSSCONNECTION")
+		if SYSTEMVSSCONNECTION != "" {
+			for i, endpoint := range server.JobRequest.Resources.Endpoints {
+				if endpoint.Name == "SYSTEMVSSCONNECTION" {
+					server.JobRequest.Resources.Endpoints[i].URL = SYSTEMVSSCONNECTION
+					break
+				}
+			}
+		}
+		resp.WriteHeader(200)
+		resp.Header().Add("content-type", "application/json")
+		resp.Header().Add("accept", "application/json")
+		src, _ := json.Marshal(server.JobRequest)
+		resp.Write(src)
+	} else if strings.HasPrefix(req.URL.Path, "/WaitForCancellation") {
+		resp.Header().Add("content-type", "application/json")
+		resp.Header().Add("accept", "application/json")
+		resp.WriteHeader(200)
+		resp.(http.Flusher).Flush()
+		for {
+			select {
+			case <-server.CancelCtx.Done():
+				resp.Write([]byte("cancelled\n\n"))
+				resp.(http.Flusher).Flush()
+				return
+			case <-req.Context().Done():
+				resp.Write([]byte("stopped\n\n"))
+				resp.(http.Flusher).Flush()
+				return
+			case <-time.After(10 * time.Second):
+				resp.Write([]byte("ping\n\n"))
+				resp.(http.Flusher).Flush()
+			}
+		}
 	} else {
 		resp.WriteHeader(404)
 	}
