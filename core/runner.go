@@ -14,4 +14,5 @@ type Runner struct {
 	Address      string   `json:"address"`
 	Labels       []string `json:"labels"`
 	RunnerWorker []string `json:"runner_worker"`
+	Capacity     int      `json:"capacity"`
 }

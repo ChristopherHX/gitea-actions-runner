@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ChristopherHX/gitea-actions-runner/config"
+	"github.com/ChristopherHX/gitea-actions-runner/core"
 	"github.com/ChristopherHX/gitea-actions-runner/exec"
 	"github.com/ChristopherHX/gitea-actions-runner/util"
 	"github.com/joho/godotenv"
@@ -253,7 +254,7 @@ func Execute(ctx context.Context) {
 				return err
 			}
 
-			var runner config.Runner
+			var runner core.Runner
 			if err := json.Unmarshal(content, &runner); err != nil {
 				return err
 			}

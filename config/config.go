@@ -31,7 +31,7 @@ type (
 		Name         string            `envconfig:"GITEA_RUNNER_NAME"`
 		Token        string            `ignored:"true"`
 		RunnerWorker []string          `envconfig:"GITEA_RUNNER_WORKER"`
-		Capacity     int               `envconfig:"GITEA_RUNNER_CAPACITY" default:"1"`
+		Capacity     int               `envconfig:"GITEA_RUNNER_CAPACITY"`
 		File         string            `envconfig:"GITEA_RUNNER_FILE" default:".runner"`
 		Environ      map[string]string `envconfig:"GITEA_RUNNER_ENVIRON"`
 		EnvFile      string            `envconfig:"GITEA_RUNNER_ENV_FILE"`
@@ -78,6 +78,12 @@ func FromEnviron() (Config, error) {
 		if cfg.Runner.Name == "" {
 			cfg.Runner.Name = runner.Name
 		}
+		if cfg.Runner.Capacity < 1 {
+			cfg.Runner.Capacity = runner.Capacity
+		}
+	}
+	if cfg.Runner.Capacity < 1 {
+		cfg.Runner.Capacity = 1
 	}
 
 	// runner config
