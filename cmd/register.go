@@ -5,9 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -23,8 +21,6 @@ import (
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-
-	_ "embed"
 )
 
 // runRegister registers a runner to the server
@@ -133,12 +129,6 @@ func validateLabels(labels []string) error {
 	return nil
 }
 
-//go:embed actions-runner-worker.py
-var pythonWorkerScript string
-
-//go:embed actions-runner-worker.ps1
-var pwshWorkerScript string
-
 func (r *registerInputs) assignToNext(stage registerStage, value string) registerStage {
 	// must set instance address and token.
 	// if empty, keep current stage.
@@ -207,72 +197,13 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 	return StageUnknown
 }
 
-const actionsRunnerVersion string = "2.323.0"
-const runnerServerRunnerVersion string = "3.13.3"
-
 func (r *registerInputs) setupRunner() registerStage {
-	d := util.DownloadRunner
-	if r.RunnerType == 2 {
-		d = util.DownloadRunnerServer
+	rargs := util.SetupRunner(r.RunnerType, r.RunnerVersion)
+	if len(rargs) == 0 {
+		log.Infoln("Failed to setup runner, please check the input.")
+		return StageInputRunnerChoice
 	}
-	if r.RunnerVersion == "" {
-		if r.RunnerType == 1 {
-			r.RunnerVersion = actionsRunnerVersion
-		} else {
-			r.RunnerVersion = runnerServerRunnerVersion
-		}
-	}
-	wd, _ := os.Getwd()
-	p := filepath.Join(wd, "actions-runner-"+r.RunnerVersion)
-	if fi, err := os.Stat(p); err == nil && fi.IsDir() {
-		log.Infof("Runner %s already exists, skip downloading.", r.RunnerVersion)
-	} else {
-		if err := d(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, p, r.RunnerVersion); err != nil {
-			log.Infoln("Something went wrong: %s" + err.Error())
-			return StageInputRunnerChoice
-		}
-	}
-
-	pwshScript := filepath.Join(p, "actions-runner-worker.ps1")
-	_ = os.WriteFile(pwshScript, []byte(pwshWorkerScript), 0755)
-	pythonScript := filepath.Join(p, "actions-runner-worker.py")
-	_ = os.WriteFile(pythonScript, []byte(pythonWorkerScript), 0755)
-
-	var pythonPath string
-	var err error
-	ext := ""
-	if runtime.GOOS != "windows" {
-		pythonPath, err = exec.LookPath("python3")
-		if err != nil {
-			pythonPath, _ = exec.LookPath("python")
-		}
-	} else {
-		ext = ".exe"
-	}
-	if pythonPath == "" {
-		pwshPath, err := exec.LookPath("pwsh")
-		if err != nil {
-			pwshVersion := "7.4.7"
-			pwshPath = filepath.Join(wd, "pwsh-"+pwshVersion)
-			if fi, err := os.Stat(pwshPath); err == nil && fi.IsDir() {
-				log.Infof("pwsh %s already exists, skip downloading.", pwshVersion)
-			} else {
-				log.Infoln("pwsh not found, downloading pwsh...")
-				err = util.DownloadPwsh(context.Background(), log.StandardLogger(), runtime.GOOS+"/"+runtime.GOARCH, pwshPath, pwshVersion)
-				if err != nil {
-					log.Infoln("Something went wrong: %s" + err.Error())
-					return StageInputRunnerChoice
-				}
-			}
-			pwshPath = filepath.Join(pwshPath, "pwsh"+ext)
-		} else {
-			log.Infoln("pwsh found, using pwsh...")
-		}
-		r.RunnerWorker = []string{pwshPath, pwshScript, filepath.Join(p, "bin", "Runner.Worker"+ext)}
-	} else {
-		log.Infoln("python found, using python...")
-		r.RunnerWorker = []string{pythonPath, pythonScript, filepath.Join(p, "bin", "Runner.Worker"+ext)}
-	}
+	r.RunnerWorker = rargs
 	return StageInputInstance
 }
 
@@ -333,7 +264,7 @@ func printStageHelp(stage registerStage) {
 		}
 		log.Infof("Enter the worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker%s:\n", suffix)
 	case StageInputRunnerVersion:
-		log.Infof("Specify the version of the runner? (for example %s or %s):\n", actionsRunnerVersion, runnerServerRunnerVersion)
+		log.Infof("Specify the version of the runner? (for example %s or %s):\n", util.ActionsRunnerVersion, util.RunnerServerRunnerVersion)
 	case StageInputInstance:
 		log.Infoln("Enter the Gitea instance URL (for example, https://gitea.com/):")
 	case StageInputToken:

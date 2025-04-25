@@ -23,6 +23,7 @@ import (
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"github.com/ChristopherHX/gitea-actions-runner/actions/server"
 	"github.com/ChristopherHX/gitea-actions-runner/client"
+	"github.com/ChristopherHX/gitea-actions-runner/runners"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/yaml.v3"
@@ -556,11 +557,38 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		return err
 	}
 
-	var workerV2 bool
-	if len(runnerWorker) > 0 && runnerWorker[0] == "--worker-v2" {
-		runnerWorker = runnerWorker[1:]
-		workerV2 = true
+	workerOptions := map[string]string{}
+	opts := 0
+	for i := 0; i < len(runnerWorker); i++ {
+		if strings.HasPrefix(runnerWorker[i], "--") {
+			k, v, _ := strings.Cut(runnerWorker[i], "=")
+			workerOptions[k] = v
+			opts++
+		} else {
+			break
+		}
 	}
+	runnerWorker = runnerWorker[opts:]
+
+	if allowClone, ok := workerOptions["--allow-clone"]; ok && allowClone == "" {
+		if maxParallelRaw, ok := workerOptions["--max-parallel"]; ok {
+			maxParallel, _ := strconv.Atoi(maxParallelRaw)
+			if maxParallel > 1 {
+				if rootDir, ok := workerOptions["--runner-dir"]; ok && len(rootDir) > 0 {
+					_, prefix, ext, _, tmpdir, err := runners.CreateExternalRunnerDirectory(runners.Parameters{
+						RunnerPath:      rootDir,
+						RunnerDirectory: "runners",
+					})
+					if err != nil {
+						return err
+					}
+					defer os.RemoveAll(tmpdir)
+					runnerWorker[len(runnerWorker)-1] = path.Join(tmpdir, "bin", prefix+".Worker"+ext)
+				}
+			}
+		}
+	}
+	_, workerV2 := workerOptions["--worker-v2"]
 
 	var httpServer *http.Server
 	if !workerV2 {

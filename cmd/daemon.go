@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/ChristopherHX/gitea-actions-runner/client"
@@ -47,6 +48,9 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			Labels:        cfg.Runner.Labels,
 			RunnerWorker:  cfg.Runner.RunnerWorker,
 		}
+		flags := []string{fmt.Sprintf("--max-parallel=%d", cfg.Runner.Capacity)}
+
+		runner.RunnerWorker = append(flags, runner.RunnerWorker...)
 
 		resp, err := cli.Declare(cmd.Context(), &connect.Request[runnerv1.DeclareRequest]{
 			Msg: &runnerv1.DeclareRequest{
