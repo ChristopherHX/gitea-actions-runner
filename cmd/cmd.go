@@ -2,13 +2,19 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"runtime"
+	"strings"
 
+	"github.com/ChristopherHX/gitea-actions-runner/config"
 	"github.com/ChristopherHX/gitea-actions-runner/exec"
+	"github.com/ChristopherHX/gitea-actions-runner/util"
 	"github.com/joho/godotenv"
 	"github.com/kardianos/service"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -230,6 +236,77 @@ func Execute(ctx context.Context) {
 	cmdExec.Flags().StringVar(&secretsPath, "secrets-file", "", "Read in a context file.")
 	cmdExec.Flags().StringSliceVar(&workerArgs, "worker", []string{}, "worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker")
 	rootCmd.AddCommand(cmdExec)
+
+	var capacity int
+	var allowCloneUpgrade bool
+	cmdUpdate := &cobra.Command{
+		Use:   "update",
+		Short: "Update the managed runner",
+		Args:  cobra.MaximumNArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.FromEnviron()
+			if err != nil {
+				return err
+			}
+			content, err := os.ReadFile(cfg.Runner.File)
+			if err != nil {
+				return err
+			}
+
+			var runner config.Runner
+			if err := json.Unmarshal(content, &runner); err != nil {
+				return err
+			}
+
+			if capacity > 0 && runner.Capacity != capacity {
+				runner.Capacity = capacity
+				log.Info("update: updated capacity to ", capacity)
+			}
+			if len(regArgs.RunnerWorker) > 0 {
+				runner.RunnerWorker = regArgs.RunnerWorker
+			}
+			if regArgs.RunnerType != 0 {
+				worker := util.SetupRunner(regArgs.RunnerType, regArgs.RunnerVersion)
+				if worker != nil {
+					runner.RunnerWorker = worker
+				} else {
+					log.Error("update: failed to setup runner of type ", regArgs.RunnerType, " and version ", regArgs.RunnerVersion)
+					return err
+				}
+			}
+			flags := []string{}
+			if allowCloneUpgrade && len(runner.RunnerWorker) == 3 && path.IsAbs(runner.RunnerWorker[0]) && path.IsAbs(runner.RunnerWorker[1]) && path.IsAbs(runner.RunnerWorker[2]) {
+				wd, _ := os.Getwd()
+				bindir := path.Dir(runner.RunnerWorker[2])
+				rootdir := path.Dir(bindir)
+				runnerDirBaseName := path.Base(rootdir)
+				var version string
+				m, err := fmt.Sscanf(runnerDirBaseName, "actions-runner-%s", &version)
+				interpreter := strings.TrimSuffix(path.Base(runner.RunnerWorker[0]), path.Ext(runner.RunnerWorker[0]))
+				if m == 1 && err == nil && path.Dir(rootdir) == wd && path.Base(bindir) == "bin" && (interpreter == "python" || interpreter == "python3") && path.Base(runner.RunnerWorker[1]) == "actions-runner-worker.py" || interpreter == "pwsh" && path.Base(runner.RunnerWorker[1]) == "actions-runner-worker.ps1" {
+					flags = append(flags, "--runner-dir="+rootdir, "--allow-clone")
+					log.Info("update: upgraded runner config to allow capacity > 1")
+				} else {
+					log.WithError(err).Info("update: automated upgrade not applicable")
+				}
+			}
+			runner.RunnerWorker = append(flags, runner.RunnerWorker...)
+			file, err := json.MarshalIndent(runner, "", "  ")
+			if err != nil {
+				log.WithError(err).Error("update: cannot marshal the json input")
+				return err
+			}
+
+			// store runner config in .runner file
+			return os.WriteFile(cfg.Runner.File, file, 0o644)
+		},
+	}
+	cmdUpdate.Flags().IntVarP(&capacity, "capacity", "c", 0, "Runner capacity")
+	cmdUpdate.Flags().StringSliceVar(&regArgs.RunnerWorker, "worker", []string{}, fmt.Sprintf("worker args for example pwsh,actions-runner-worker.ps1,actions-runner/bin/Runner.Worker%s", suffix))
+	cmdUpdate.Flags().Int32Var(&regArgs.RunnerType, "type", 0, "Runner type to download, 0 for manual see --worker, 1 for official, 2 for ChristopherHX/runner.server (windows container support)")
+	cmdUpdate.Flags().StringVar(&regArgs.RunnerVersion, "version", "", "Runner version to download without v prefix")
+	cmdUpdate.Flags().BoolVar(&allowCloneUpgrade, "allow-clone-upgrade", false, "tries to upgrade an old runner setup to allow capacity > 1")
+	rootCmd.AddCommand(cmdUpdate)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
