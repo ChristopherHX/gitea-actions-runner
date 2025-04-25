@@ -49,6 +49,7 @@ func CreateExternalRunnerDirectory(parameters Parameters) (azure bool, prefix, e
 	if err != nil {
 		return
 	}
+	os.MkdirAll(filepath.Join(root, "externals"), 0755)
 	os.Symlink(filepath.Join(root, "externals"), filepath.Join(tmpdir, "externals"))
 	os.Symlink(filepath.Join(root, "license.html"), filepath.Join(tmpdir, "license.html"))
 	return
