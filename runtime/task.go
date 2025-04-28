@@ -741,8 +741,10 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					if strings.HasPrefix(nameAndPathOrRef[0], proto) {
 						re := strings.Split(strings.TrimPrefix(nameAndPathOrRef[0], proto), "/")
 						nameAndPath = append([]string{strings.ReplaceAll(proto+re[0]+"/"+re[1], ":", "~")}, re[2:]...)
-						aserver.AuthData[nameAndPathOrRef[0]] = &protocol.ActionDownloadAuthentication{
-							Token: token,
+						if token != "" {
+							aserver.AuthData[nameAndPathOrRef[0]] = &protocol.ActionDownloadAuthentication{
+								Token: token,
+							}
 						}
 						break
 					}
