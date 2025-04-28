@@ -126,12 +126,12 @@ func Execute(ctx context.Context) {
 			stdOut, err := os.OpenFile("gitea-actions-runner-log.txt", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0777)
 			if err == nil {
 				os.Stdout = stdOut
-				defer os.Stdout.Close()
+				defer stdOut.Sync()
 			}
 			stdErr, err := os.OpenFile("gitea-actions-runner-log-error.txt", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0777)
 			if err == nil {
 				os.Stderr = stdErr
-				defer os.Stderr.Close()
+				defer stdErr.Sync()
 			}
 
 			err = godotenv.Overload(gArgs.EnvFile)
