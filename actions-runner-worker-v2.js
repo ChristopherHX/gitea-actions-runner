@@ -51,10 +51,20 @@ var client = null;
 const ACTIONS_RUNNER_WORKER_DEBUG = process.env.ACTIONS_RUNNER_WORKER_DEBUG === '1'
 
 const server = http.createServer((req, res) => {
+    let headers = {}
+    for (const name in req.headers) {
+      if (!name.startsWith(':') && name !== "connection" && name !== "upgrade" && name !== "host" && name !== "transfer-encoding") {
+        headers[name] = req.headers[name];
+      }
+    }
+    if (ACTIONS_RUNNER_WORKER_DEBUG) {
+      console.error('Request headers:', headers);
+    }
     const creq = client.request({
-            ':method': req.method,
-            ':path': req.url,
-        }
+        ':method': req.method,
+        ':path': req.url,
+        ...headers
+      }
     );
 
     req.pipe(creq)

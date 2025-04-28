@@ -267,12 +267,17 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		resp.WriteHeader(404)
 	} else if strings.HasPrefix(req.URL.Path, "/JobRequest") {
 		SYSTEMVSSCONNECTION := req.URL.Query().Get("SYSTEMVSSCONNECTION")
+		// Normalize the URL to ensure it ends with a slash
+		SYSTEMVSSCONNECTION = strings.TrimSuffix(SYSTEMVSSCONNECTION, "/") + "/"
+		server.ExternalURL = SYSTEMVSSCONNECTION
 		CacheServerUrl := req.URL.Query().Get("CacheServerUrl")
 		if SYSTEMVSSCONNECTION != "" {
 			for i, endpoint := range server.JobRequest.Resources.Endpoints {
 				if endpoint.Name == "SYSTEMVSSCONNECTION" {
 					server.JobRequest.Resources.Endpoints[i].URL = SYSTEMVSSCONNECTION
 					if CacheServerUrl != "" {
+						// Normalize the URL to ensure it ends with a slash
+						CacheServerUrl = strings.TrimSuffix(CacheServerUrl, "/") + "/"
 						server.JobRequest.Resources.Endpoints[i].Data["CacheServerUrl"] = CacheServerUrl
 					} else if server.JobRequest.Resources.Endpoints[i].Data["CacheServerUrl"] == "" {
 						server.JobRequest.Resources.Endpoints[i].Data["CacheServerUrl"] = SYSTEMVSSCONNECTION
