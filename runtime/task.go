@@ -670,8 +670,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		os.Setenv("NO_PROXY", no_proxy)
 	}
 
-	var cacheServerUrl string
-	if httpServer != nil {
+	cacheServerUrl := os.Getenv("GITEA_ACTIONS_CACHE_SERVER_URL")
+	if httpServer != nil && cacheServerUrl == "" {
 		if wd, err := os.Getwd(); err == nil {
 			if cache, err := artifactcache.StartHandler(filepath.Join(wd, "cache"), hostname, 0, log.New()); err == nil {
 				cacheServerUrl = cache.ExternalURL() + "/"
