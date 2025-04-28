@@ -61,7 +61,7 @@ else
 endif
 
 TAGS ?=
-LDFLAGS ?= -X 'gitea.com/gitea/act_runner/cmd.version=$(RELEASE_VERSION)'
+LDFLAGS ?= -X 'github.com/ChristopherHX/gitea-actions-runner/cmd.version=$(RELEASE_VERSION)'
 
 all: build
 
