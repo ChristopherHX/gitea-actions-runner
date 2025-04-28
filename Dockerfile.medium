@@ -24,7 +24,7 @@ RUN curl -f -L -o runner-container-hooks.zip https://github.com/actions/runner-c
     && unzip ./runner-container-hooks.zip -d ./k8s \
     && rm runner-container-hooks.zip
 
-FROM golang:1.23-alpine as builder
+FROM golang:1.24-alpine as builder
 # Do not remove `git` here, it is required for getting runner version when executing `make build`
 RUN apk add --no-cache make git
 
