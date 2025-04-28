@@ -18,12 +18,13 @@ import (
 
 type ActionsServer struct {
 	TraceLog         chan interface{}
-	ServerUrl        string
-	ActionsServerUrl string
+	ServerURL        string
+	ActionsServerURL string
 	AuthData         map[string]*protocol.ActionDownloadAuthentication
 	JobRequest       *protocol.AgentJobRequestMessage
 	CancelCtx        context.Context
 	CacheHandler     http.Handler
+	ExternalURL      string
 }
 
 func ToPipelineContextDataWithError(data interface{}) (protocol.PipelineContextData, error) {
@@ -179,13 +180,13 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 			}
 			if !absolute {
 				var urls []string
-				if server.ServerUrl != server.ActionsServerUrl {
-					urls = []string{server.ServerUrl, server.ActionsServerUrl}
+				if server.ServerURL != server.ActionsServerURL {
+					urls = []string{server.ServerURL, server.ActionsServerURL}
 				} else {
-					urls = []string{server.ActionsServerUrl}
+					urls = []string{server.ActionsServerURL}
 				}
 				for _, url := range urls {
-					noAuth = url != server.ServerUrl
+					noAuth = url != server.ServerURL
 					if noAuth {
 						resolved.TarballUrl = fmt.Sprintf("%s/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
 						resolved.ZipballUrl = fmt.Sprintf("%s/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
@@ -204,10 +205,8 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 				// 	ExpiresAt: "0001-01-01T00:00:00",
 				// 	Token:     "dummy-token",
 				// }
-				dst := *req.URL
-				dst.Scheme = "http"
-				dst.Host = req.Host
-				dst.Path = "/_apis/v1/ActionDownload"
+				dst, _ := url.Parse(server.ExternalURL)
+				dst.Path += "_apis/v1/ActionDownload"
 				q := dst.Query()
 				q.Set("url", resolved.TarballUrl)
 				dst.RawQuery = q.Encode()
@@ -238,7 +237,7 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		resp.WriteHeader(rsp.StatusCode)
 		io.Copy(resp, rsp.Body)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/pipelines/workflows/") {
-		surl, _ := url.Parse(server.ServerUrl)
+		surl, _ := url.Parse(server.ServerURL)
 		url := *req.URL
 		url.Scheme = surl.Scheme
 		url.Host = surl.Host

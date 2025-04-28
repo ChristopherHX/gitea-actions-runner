@@ -345,8 +345,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	}
 	aserver := &server.ActionsServer{
 		TraceLog:         make(chan interface{}),
-		ServerUrl:        dataContext["server_url"].GetStringValue(),
-		ActionsServerUrl: dataContext["gitea_default_actions_url"].GetStringValue(),
+		ServerURL:        dataContext["server_url"].GetStringValue(),
+		ActionsServerURL: dataContext["gitea_default_actions_url"].GetStringValue(),
 		AuthData:         map[string]*protocol.ActionDownloadAuthentication{},
 	}
 	defer func() {
@@ -552,7 +552,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		}
 	}()
 
-	listener, err := net.Listen("tcp", ":0")
+	actionsRuntimeListeningAddr := getListeningAddress("GITEA_ACTIONS_RUNNER_RUNTIME_LISTENING_ADDRESS")
+	listener, err := net.Listen("tcp", actionsRuntimeListeningAddr)
 	if err != nil {
 		return err
 	}
@@ -670,14 +671,30 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		os.Setenv("NO_PROXY", no_proxy)
 	}
 
+	externalURL := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_EXTERNAL_URL")
+	if externalURL == "" {
+		externalURL = fmt.Sprintf("http://%s:%d/", hostname, listener.Addr().(*net.TCPAddr).Port)
+	}
+	// Normalize externalURL to ensure it ends with a slash
+	aserver.ExternalURL = strings.TrimSuffix(externalURL, "/") + "/"
+
 	cacheServerUrl := os.Getenv("GITEA_ACTIONS_CACHE_SERVER_URL")
 	if httpServer != nil && cacheServerUrl == "" {
 		if wd, err := os.Getwd(); err == nil {
-			if cache, err := artifactcache.StartHandler(filepath.Join(wd, "cache"), hostname, 0, log.New()); err == nil {
-				cacheServerUrl = cache.ExternalURL() + "/"
-				defer cache.Close()
+			if actionsRuntimeListeningAddr == ":0" {
+				if cache, err := artifactcache.StartHandler(filepath.Join(wd, "cache"), hostname, 0, log.New()); err == nil {
+					cacheServerUrl = cache.ExternalURL() + "/"
+					defer cache.Close()
+				}
+			} else {
+				_, aserver.CacheHandler, _ = artifactcache.CreateHandler(filepath.Join(wd, "cache"), externalURL, nil)
+				cacheServerUrl = externalURL
 			}
 		}
+	}
+	// Normalize cacheServerUrl to ensure it ends with a slash
+	if cacheServerUrl != "" {
+		cacheServerUrl = strings.TrimSuffix(cacheServerUrl, "/") + "/"
 	}
 	if httpServer != nil {
 		go func() {
@@ -952,7 +969,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 						"CacheServerUrl":    cacheServerUrl,
 						"ResultsServiceUrl": server_url,
 					},
-					URL: fmt.Sprintf("http://%s:%d/", hostname, listener.Addr().(*net.TCPAddr).Port),
+					URL: externalURL,
 					Authorization: protocol.JobAuthorization{
 						Scheme: "OAuth",
 						Parameters: map[string]string{
@@ -1087,6 +1104,14 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	}
 
 	return nil
+}
+
+func getListeningAddress(envName string) string {
+	addr := os.Getenv(envName)
+	if addr == "" {
+		addr = ":0"
+	}
+	return addr
 }
 
 // Check Timeline Integrity adding fake started and stopped boundaries
