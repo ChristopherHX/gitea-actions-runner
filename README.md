@@ -106,3 +106,7 @@ If the registry succeed, you could run the runner directly.
 A lot of my projects can communicate through various indirections.
 
 ![C4_Elements](https://github.com/ChristopherHX/gitea-actions-runner/assets/44845461/78ff5218-570c-4506-81a5-a1baa26f8016)
+
+### Integrations based on this Project
+
+- [QEMU-KVM-Solution](https://github.com/CrimsonGiteaActions/QEMU-KVM-Solution)
