@@ -1,13 +1,14 @@
 module github.com/ChristopherHX/gitea-actions-runner
 
-go 1.23.0
+go 1.24
 
-toolchain go1.23.5
+toolchain go1.24.2
 
 require (
 	code.gitea.io/actions-proto-go v0.4.1
 	connectrpc.com/connect v1.18.1
 	github.com/ChristopherHX/github-act-runner v0.10.0
+	github.com/actions-oss/act-cli v0.3.3-0.20250426145830-bb13ab4f84d5
 	github.com/avast/retry-go/v4 v4.6.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
@@ -39,6 +40,7 @@ require (
 	github.com/go-git/go-billy/v5 v5.6.2 // indirect
 	github.com/go-git/go-git/v5 v5.16.0 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect

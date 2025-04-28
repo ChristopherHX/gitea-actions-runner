@@ -7,10 +7,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/ChristopherHX/github-act-runner/protocol"
+	"github.com/actions-oss/act-cli/pkg/artifactcache"
 )
 
 type ActionsServer struct {
@@ -20,6 +23,7 @@ type ActionsServer struct {
 	AuthData         map[string]*protocol.ActionDownloadAuthentication
 	JobRequest       *protocol.AgentJobRequestMessage
 	CancelCtx        context.Context
+	CacheHandler     http.Handler
 }
 
 func ToPipelineContextDataWithError(data interface{}) (protocol.PipelineContextData, error) {
@@ -264,10 +268,19 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		resp.WriteHeader(404)
 	} else if strings.HasPrefix(req.URL.Path, "/JobRequest") {
 		SYSTEMVSSCONNECTION := req.URL.Query().Get("SYSTEMVSSCONNECTION")
+		CacheServerUrl := req.URL.Query().Get("CacheServerUrl")
 		if SYSTEMVSSCONNECTION != "" {
 			for i, endpoint := range server.JobRequest.Resources.Endpoints {
 				if endpoint.Name == "SYSTEMVSSCONNECTION" {
 					server.JobRequest.Resources.Endpoints[i].URL = SYSTEMVSSCONNECTION
+					if CacheServerUrl != "" {
+						server.JobRequest.Resources.Endpoints[i].Data["CacheServerUrl"] = CacheServerUrl
+					} else if server.JobRequest.Resources.Endpoints[i].Data["CacheServerUrl"] == "" {
+						server.JobRequest.Resources.Endpoints[i].Data["CacheServerUrl"] = SYSTEMVSSCONNECTION
+						if wd, err := os.Getwd(); err == nil {
+							_, server.CacheHandler, _ = artifactcache.CreateHandler(filepath.Join(wd, "cache"), SYSTEMVSSCONNECTION, nil)
+						}
+					}
 					break
 				}
 			}
@@ -297,6 +310,8 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 				resp.(http.Flusher).Flush()
 			}
 		}
+	} else if server.CacheHandler != nil {
+		server.CacheHandler.ServeHTTP(resp, req)
 	} else {
 		resp.WriteHeader(404)
 	}
