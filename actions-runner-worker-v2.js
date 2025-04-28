@@ -46,14 +46,7 @@ class StdioDuplex extends Duplex {
 // Create an instance of the custom duplex stream.
 const stdioDuplex = new StdioDuplex();
 
-// Use Node's native HTTP/2 client with a custom connection.
-// The "authority" URL here is a placeholder. HTTP/2 requires a proper protocol negotiation,
-// so the underlying framing might need additional handling if you're bridging to a non-standard transport.
-const client = http2.connect('http://localhost', {
-  createConnection: () => stdioDuplex,
-  // Additional options might be required depending on your environment.
-  sessionTimeout: 60 * 60 * 24 * 7,
-});
+var client = null;
 
 const ACTIONS_RUNNER_WORKER_DEBUG = process.env.ACTIONS_RUNNER_WORKER_DEBUG === '1'
 
@@ -100,6 +93,15 @@ const hostname = process.argv.length > 3 ? process.argv[3] : "localhost";
 server.listen(0, hostname, () => {
   const port = server.address().port;
   console.error(`Server running at http://${hostname}:${port}/`);
+
+  // Use Node's native HTTP/2 client with a custom connection.
+  // The "authority" URL here is a placeholder. HTTP/2 requires a proper protocol negotiation,
+  // so the underlying framing might need additional handling if you're bridging to a non-standard transport.
+  client = http2.connect(`http://${hostname}:${port}/`, {
+    createConnection: () => stdioDuplex,
+    // Additional options might be required depending on your environment.
+    sessionTimeout: 60 * 60 * 24 * 7,
+  });
 
   // Get the worker path from the command line.
   const worker = process.argv[2];
