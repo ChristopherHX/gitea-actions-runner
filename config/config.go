@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"runtime"
@@ -53,12 +54,18 @@ func FromEnviron() (Config, error) {
 
 	// check runner config exist
 	if f, err := os.Stat(cfg.Runner.File); err == nil && !f.IsDir() {
-		jsonFile, _ := os.Open(cfg.Runner.File)
+		jsonFile, err := os.Open(cfg.Runner.File)
+		if err != nil {
+			return cfg, err
+		}
 		defer jsonFile.Close()
-		byteValue, _ := io.ReadAll(jsonFile)
+		byteValue, err := io.ReadAll(jsonFile)
+		if err != nil {
+			return cfg, err
+		}
 		var runner core.Runner
 		if err := json.Unmarshal(byteValue, &runner); err != nil {
-			return cfg, err
+			return cfg, fmt.Errorf("%w: %s", err, string(byteValue))
 		}
 		if cfg.Runner.UUID == "" {
 			cfg.Runner.UUID = runner.UUID
