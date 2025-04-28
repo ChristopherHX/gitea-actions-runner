@@ -126,6 +126,7 @@ func Execute(ctx context.Context) {
 			stdOut, err := os.OpenFile("gitea-actions-runner-log.txt", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0777)
 			if err == nil {
 				os.Stdout = stdOut
+				log.SetOutput(os.Stdout)
 				defer stdOut.Sync()
 			}
 			stdErr, err := os.OpenFile("gitea-actions-runner-log-error.txt", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0777)
