@@ -30,8 +30,8 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/ChristopherHX/github-act-runner/protocol"
+	"github.com/actions-oss/act-cli/pkg/artifactcache"
 	"github.com/google/uuid"
-	"github.com/nektos/act/pkg/artifactcache"
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/exprparser"
 	"github.com/nektos/act/pkg/model"
@@ -671,10 +671,12 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	}
 
 	var cacheServerUrl string
-	if wd, err := os.Getwd(); err == nil {
-		if cache, err := artifactcache.StartHandler(filepath.Join(wd, "cache"), hostname, 0, log.New()); err == nil {
-			cacheServerUrl = cache.ExternalURL() + "/"
-			defer cache.Close()
+	if httpServer != nil {
+		if wd, err := os.Getwd(); err == nil {
+			if cache, err := artifactcache.StartHandler(filepath.Join(wd, "cache"), hostname, 0, log.New()); err == nil {
+				cacheServerUrl = cache.ExternalURL() + "/"
+				defer cache.Close()
+			}
 		}
 	}
 	if httpServer != nil {
