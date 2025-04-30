@@ -37,6 +37,7 @@ type (
 		Environ      map[string]string `envconfig:"GITEA_RUNNER_ENVIRON"`
 		EnvFile      string            `envconfig:"GITEA_RUNNER_ENV_FILE"`
 		Labels       []string          `envconfig:"GITEA_RUNNER_LABELS"`
+		Ephemeral    bool              `ignored:"true"`
 	}
 
 	Platform struct {

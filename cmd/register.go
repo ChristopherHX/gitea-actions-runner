@@ -43,7 +43,7 @@ func runRegister(ctx context.Context, regArgs *registerArgs, envFile string) fun
 			}
 		} else {
 			go func() {
-				if err := registerInteractive(envFile); err != nil {
+				if err := registerInteractive(envFile, regArgs); err != nil {
 					// log.Errorln(err)
 					os.Exit(2)
 					return
@@ -70,6 +70,7 @@ type registerArgs struct {
 	Labels        string
 	RunnerType    int32
 	RunnerVersion string
+	Ephemeral     bool
 }
 
 type registerStage int8
@@ -102,6 +103,7 @@ type registerInputs struct {
 	CustomLabels  []string
 	RunnerType    int32
 	RunnerVersion string
+	Ephemeral     bool
 }
 
 func (r *registerInputs) validate() error {
@@ -127,6 +129,32 @@ func (r *registerInputs) validate() error {
 
 func validateLabels(labels []string) error {
 	return nil
+}
+
+func (r *registerInputs) stageValue(stage registerStage) string {
+	switch stage {
+	case StageInputRunnerChoice:
+		if r.RunnerType != 0 || len(r.RunnerWorker) != 0 {
+			return fmt.Sprint(r.RunnerType)
+		}
+	case StageInputRunnerVersion:
+		return r.RunnerVersion
+	case StageInputRunnerWorker:
+		if len(r.RunnerWorker) > 0 {
+			return strings.Join(r.RunnerWorker, ",")
+		}
+	case StageInputInstance:
+		return r.InstanceAddr
+	case StageInputToken:
+		return r.Token
+	case StageInputRunnerName:
+		return r.RunnerName
+	case StageInputCustomLabels:
+		if len(r.CustomLabels) > 0 {
+			return strings.Join(r.CustomLabels, ",")
+		}
+	}
+	return ""
 }
 
 func (r *registerInputs) assignToNext(stage registerStage, value string) registerStage {
@@ -190,6 +218,7 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 
 		if validateLabels(r.CustomLabels) != nil {
 			log.Infoln("Invalid labels, please input again, leave blank to use the default labels (for example, self-hosted,ubuntu-latest)")
+			r.CustomLabels = nil
 			return StageInputCustomLabels
 		}
 		return StageWaitingForRegistration
@@ -207,11 +236,11 @@ func (r *registerInputs) setupRunner() registerStage {
 	return StageInputInstance
 }
 
-func registerInteractive(envFile string) error {
+func registerInteractive(envFile string, regArgs *registerArgs) error {
 	var (
 		reader = bufio.NewReader(os.Stdin)
 		stage  = StageInputRunnerChoice
-		inputs = new(registerInputs)
+		inputs = initInputs(regArgs)
 	)
 
 	// check if overwrite local config
@@ -222,11 +251,14 @@ func registerInteractive(envFile string) error {
 	}
 
 	for {
-		printStageHelp(stage)
-
-		cmdString, err := reader.ReadString('\n')
-		if err != nil {
-			return err
+		cmdString := inputs.stageValue(stage)
+		if cmdString == "" {
+			printStageHelp(stage)
+			var err error
+			cmdString, err = reader.ReadString('\n')
+			if err != nil {
+				return err
+			}
 		}
 		stage = inputs.assignToNext(stage, strings.TrimSpace(cmdString))
 
@@ -282,18 +314,9 @@ func printStageHelp(stage registerStage) {
 func registerNoInteractive(envFile string, regArgs *registerArgs) error {
 	_ = godotenv.Load(envFile)
 	cfg, _ := config.FromEnviron()
-	inputs := &registerInputs{
-		RunnerWorker:  regArgs.RunnerWorker,
-		InstanceAddr:  regArgs.InstanceAddr,
-		Token:         regArgs.Token,
-		RunnerName:    regArgs.RunnerName,
-		CustomLabels:  defaultLabels,
-		RunnerType:    regArgs.RunnerType,
-		RunnerVersion: regArgs.RunnerVersion,
-	}
-	regArgs.Labels = strings.TrimSpace(regArgs.Labels)
-	if regArgs.Labels != "" {
-		inputs.CustomLabels = strings.Split(regArgs.Labels, ",")
+	inputs := initInputs(regArgs)
+	if len(inputs.CustomLabels) == 0 {
+		inputs.CustomLabels = defaultLabels
 	}
 	if inputs.RunnerName == "" {
 		inputs.RunnerName, _ = os.Hostname()
@@ -309,6 +332,23 @@ func registerNoInteractive(envFile string, regArgs *registerArgs) error {
 	}
 	log.Infof("Runner registered successfully.")
 	return nil
+}
+
+func initInputs(regArgs *registerArgs) *registerInputs {
+	inputs := &registerInputs{
+		RunnerWorker:  regArgs.RunnerWorker,
+		InstanceAddr:  regArgs.InstanceAddr,
+		Token:         regArgs.Token,
+		RunnerName:    regArgs.RunnerName,
+		RunnerType:    regArgs.RunnerType,
+		RunnerVersion: regArgs.RunnerVersion,
+		Ephemeral:     regArgs.Ephemeral,
+	}
+	regArgs.Labels = strings.TrimSpace(regArgs.Labels)
+	if regArgs.Labels != "" {
+		inputs.CustomLabels = strings.Split(regArgs.Labels, ",")
+	}
+	return inputs
 }
 
 func doRegister(cfg *config.Config, inputs *registerInputs) error {
@@ -347,6 +387,7 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 	cfg.Runner.Token = inputs.Token
 	cfg.Runner.Labels = inputs.CustomLabels
 	cfg.Runner.RunnerWorker = inputs.RunnerWorker
+	cfg.Runner.Ephemeral = inputs.Ephemeral
 	_, err := register.New(cli).Register(ctx, cfg.Runner)
 	return err
 }

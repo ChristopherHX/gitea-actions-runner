@@ -70,6 +70,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 		}
 
 		once, _ := cmd.Flags().GetBool("once")
+		once = once || cfg.Runner.Ephemeral
 		if once {
 			cfg.Runner.Capacity = 1
 		}
