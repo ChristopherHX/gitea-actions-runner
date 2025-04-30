@@ -189,6 +189,7 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 			r.RunnerType = 2
 			return StageInputRunnerVersion
 		}
+		r.RunnerType = 0
 		log.Infoln("Invalid choice, please input again.")
 		return StageInputRunnerChoice
 	case StageInputRunnerWorker:
@@ -229,6 +230,7 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 func (r *registerInputs) setupRunner() registerStage {
 	rargs := util.SetupRunner(r.RunnerType, r.RunnerVersion)
 	if len(rargs) == 0 {
+		r.RunnerVersion = ""
 		log.Infoln("Failed to setup runner, please check the input.")
 		return StageInputRunnerChoice
 	}
