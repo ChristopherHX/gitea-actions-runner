@@ -89,6 +89,9 @@ func FromEnviron() (Config, error) {
 		if cfg.Runner.Capacity < 1 {
 			cfg.Runner.Capacity = runner.Capacity
 		}
+		if cfg.Runner.Ephemeral == false {
+			cfg.Runner.Ephemeral = runner.Ephemeral
+		}
 	}
 	if cfg.Runner.Capacity < 1 {
 		cfg.Runner.Capacity = 1
