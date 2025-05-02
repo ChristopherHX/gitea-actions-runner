@@ -1,0 +1,53 @@
+inputs:
+  GITEA_BIN:
+    description: 'Path to the Gitea binary'
+  GITEA_PLATFORM:
+    description: 'Port for Gitea to run on'
+    default: 'darwin-10.12-arm64'
+  GITEA_PORT:
+    description: 'Port for Gitea to run on'
+    default: 3005
+runs:
+  using: composite
+  steps:
+  - name: Download Gitea
+    if: ${{ !inputs.GITEA_BIN }}
+    shell: bash
+    run: |
+      GITEA_BIN="$RUNNER_TEMP/gitea-main"
+      echo "GITEA_BIN=$GITEA_BIN" >> $GITHUB_ENV
+      if [ ! -f "$GITEA_BIN" ]; then
+        echo "Downloading Gitea binary..."
+        curl -L https://dl.gitea.io/gitea/main-nightly/gitea-main-nightly-${{ inputs.GITEA_PLATFORM }} -o "$GITEA_BIN"
+        chmod +x "$GITEA_BIN"
+      fi
+  - name: Setup Gitea
+    shell: bash
+    run: |
+      mkdir -p "$RUNNER_TEMP/conf/"
+      mkdir -p "$RUNNER_TEMP/data/"
+      echo "I_AM_BEING_UNSAFE_RUNNING_AS_ROOT = true" > "$RUNNER_TEMP/conf/app.ini"
+      echo "[security]" >> "$RUNNER_TEMP/conf/app.ini"
+      echo "INTERNAL_TOKEN = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYmYiOjE1NTg4MzY4ODB9.LoKQyK5TN_0kMJFVHWUW0uDAyoGjDP6Mkup4ps2VJN4" >> "$RUNNER_TEMP/conf/app.ini"
+      echo "INSTALL_LOCK   = true" >> "$RUNNER_TEMP/conf/app.ini"
+      echo "SECRET_KEY     = 2crAW4UANgvLipDS6U5obRcFosjSJHQANll6MNfX7P0G3se3fKcCwwK3szPyGcbo" >> "$RUNNER_TEMP/conf/app.ini"
+      echo "PASSWORD_COMPLEXITY = off" >> "$RUNNER_TEMP/conf/app.ini"
+      echo "[database]" >> "$RUNNER_TEMP/conf/app.ini"
+      echo "DB_TYPE = sqlite3" >> "$RUNNER_TEMP/conf/app.ini"
+      echo "PATH = "$RUNNER_TEMP/data/gitea.db"" >> "$RUNNER_TEMP/conf/app.ini"
+      echo "[repository]" >> "$RUNNER_TEMP/conf/app.ini"
+      echo "ROOT = "$RUNNER_TEMP/data/"" >> "$RUNNER_TEMP/conf/app.ini"
+      echo "[server]" >> "$RUNNER_TEMP/conf/app.ini"
+      echo "ROOT_URL = http://localhost:$GITEA_PORT" >> "$RUNNER_TEMP/conf/app.ini"
+      "$GITEA_BIN" migrate -c "$RUNNER_TEMP/conf/app.ini"
+      "$GITEA_BIN" admin user create --username=test01 --password=test01 --email=test01@gitea.io --admin=true --must-change-password=false --access-token -c "$RUNNER_TEMP/conf/app.ini"
+      "$GITEA_BIN" web -c "$RUNNER_TEMP/conf/app.ini" -p "$GITEA_PORT" &
+      echo "waiting for gitea to start"
+      while ! curl -s -o /dev/null -w "%{http_code}" "http://localhost:$GITEA_PORT" > /dev/null; do
+        sleep 1
+      done
+      echo "TOKEN=$("$GITEA_BIN" admin user generate-access-token -u test01 -t random --raw -c "$RUNNER_TEMP/conf/app.ini")" >> $GITHUB_ENV
+      echo "RUNNER_TOKEN=$("$GITEA_BIN" actions generate-runner-token -c "$RUNNER_TEMP/conf/app.ini")" >> $GITHUB_ENV
+    env:
+      GITEA_BIN: ${{ inputs.GITEA_BIN || env.GITEA_BIN }}
+      GITEA_PORT: ${{ inputs.GITEA_PORT }}

@@ -1,0 +1,63 @@
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITEA_PORT: ${{ vars.GITEA_PORT || '3005' }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup-gitea
+      with:
+        gitea_bin: ${{ vars.GITEA_BIN }}
+        gitea_port: ${{ env.GITEA_PORT }}
+    - name: Create test repository
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.repos.createForAuthenticatedUser({
+            name: 'test-repo',
+            private: true,
+            auto_init: true,
+            default_branch: 'main',
+          })
+          // Create new file in the repository
+          await github.request("POST /repos/{owner}/{repo}/contents/{path}", {
+            owner: "test01",
+            repo: "test-repo",
+            path: '.github/workflows/test.yml',
+            message: 'Add test workflow',
+            branch: 'main',
+            content: Buffer.from(`on: push
+          jobs:
+            test:
+              runs-on: ubuntu-latest
+              steps:
+              - name: Checkout code
+                uses: actions/checkout@v4
+              - name: Run tests
+                run: echo "Running tests..."`).toString('base64'),
+          });
+          await exec.exec(`${process.env.RUNNER_BIN} register --instance http://localhost:${{ env.GITEA_PORT }} --token ${process.env.RUNNER_TOKEN} --name test-runner --labels ubuntu-latest --no-interactive --ephemeral --type 2`);
+          await exec.exec(`${process.env.RUNNER_BIN} daemon`);
+
+          await github.rest.repos.listCommitStatusesForRef({
+            owner: "test01",
+            repo: "test-repo",
+            ref: "main"
+          }).then((response) => {
+            console.log(response.data);
+            if (response.data.filter(status => status.status !== 'pending' && status.status != 'success').length === 0) {
+              console.log('Test passed');
+            } else {
+              console.log('Test failed');
+              throw new Error('Test failed');
+            }
+          });
+        github-token: ${{ env.TOKEN }}
+        base-url: "http://localhost:${{ env.GITEA_PORT }}/api/v1"
+      env:
+        RUNNER_BIN: ${{ vars.RUNNER_BIN }}
+    - name: Sleep
+      if: vars.SLEEP
+      run: |
+        sleep ${{ vars.SLEEP }}
