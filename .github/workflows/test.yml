@@ -10,6 +10,7 @@ jobs:
       with:
         gitea_bin: ${{ vars.GITEA_BIN }}
         gitea_port: ${{ env.GITEA_PORT }}
+        gitea_platform: ${{ vars.GITEA_PLATFORM || 'linux-amd64' }}
     - name: Create test repository
       uses: actions/github-script@v7
       with:
