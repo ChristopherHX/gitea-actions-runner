@@ -35,6 +35,7 @@ func (p *Register) Register(ctx context.Context, cfg config.Runner) (*core.Runne
 		Name:        cfg.Name,
 		Token:       cfg.Token,
 		AgentLabels: labels,
+		Ephemeral:   cfg.Ephemeral,
 	}))
 	if err != nil {
 		log.WithError(err).Error("poller: cannot register new runner")
@@ -49,12 +50,18 @@ func (p *Register) Register(ctx context.Context, cfg config.Runner) (*core.Runne
 		Address:      p.Client.Address(),
 		RunnerWorker: cfg.RunnerWorker,
 		Labels:       cfg.Labels,
+		Ephemeral:    resp.Msg.Runner.Ephemeral,
 	}
 
 	file, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		log.WithError(err).Error("poller: cannot marshal the json input")
 		return data, err
+	}
+
+	if cfg.Ephemeral != resp.Msg.Runner.Ephemeral {
+		// TODO we cannot remove the configuration via runner api, if we return an error here we just fill the database
+		log.Error("poller: cannot register new runner as ephemeral upgrade Gitea to gain security, run-once will be used automatically")
 	}
 
 	// store runner config in .runner file

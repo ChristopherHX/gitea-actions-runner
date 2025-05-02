@@ -15,4 +15,5 @@ type Runner struct {
 	Labels       []string `json:"labels"`
 	RunnerWorker []string `json:"runner_worker"`
 	Capacity     int      `json:"capacity"`
+	Ephemeral    bool     `json:"ephemeral"`
 }
