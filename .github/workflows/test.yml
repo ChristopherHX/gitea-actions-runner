@@ -6,6 +6,12 @@ jobs:
       GITEA_PORT: ${{ vars.GITEA_PORT || '3005' }}
     steps:
     - uses: actions/checkout@v4
+    - name: Download Runner
+      if: ${{ !vars.RUNNER_BIN }}
+      shell: bash
+      run: |
+        go build -o "$RUNNER_TEMP/gitea-runner"
+        echo "RUNNER_BIN=$RUNNER_TEMP/gitea-runner" >> $GITHUB_ENV
     - uses: ./.github/actions/setup-gitea
       with:
         gitea_bin: ${{ vars.GITEA_BIN }}
@@ -57,7 +63,7 @@ jobs:
         github-token: ${{ env.TOKEN }}
         base-url: "http://localhost:${{ env.GITEA_PORT }}/api/v1"
       env:
-        RUNNER_BIN: ${{ vars.RUNNER_BIN }}
+        RUNNER_BIN: ${{ vars.RUNNER_BIN || env.RUNNER_BIN }}
     - name: Sleep
       if: vars.SLEEP
       run: |
