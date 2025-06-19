@@ -642,11 +642,16 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		log.Info("Reporting done")
 	}()
 
-	ip := common.GetOutboundIP()
-	if ip == nil {
-		ip = net.IPv4(127, 0, 0, 1)
+	var hostname string
+	if preferredIp := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_PREFERRED_OUTBOUND_IP"); preferredIp != "" && net.ParseIP(preferredIp) != nil {
+		hostname = preferredIp
+	} else {
+		ip := common.GetOutboundIP()
+		if ip == nil {
+			ip = net.IPv4(127, 0, 0, 1)
+		}
+		hostname = ip.String()
 	}
-	hostname := ip.String()
 	if hn := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_HOSTNAME"); hn != "" {
 		hostname = hn
 	} else if v := os.Getenv("GITEA_ACTIONS_RUNNER_RUNTIME_USE_DNS_NAME"); v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") || strings.EqualFold(v, "y") {
