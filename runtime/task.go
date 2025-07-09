@@ -343,14 +343,14 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	} else {
 		shouldskip = true
 	}
-	aserver := &server.ActionsServer{
+	actionsHttpServerHandler := &server.ActionsServer{
 		TraceLog:         make(chan interface{}),
 		ServerURL:        dataContext["server_url"].GetStringValue(),
 		ActionsServerURL: dataContext["gitea_default_actions_url"].GetStringValue(),
 		AuthData:         map[string]*protocol.ActionDownloadAuthentication{},
 	}
 	defer func() {
-		close(aserver.TraceLog)
+		close(actionsHttpServerHandler.TraceLog)
 	}()
 	steps := []protocol.ActionStep{}
 	type StepMeta struct {
@@ -395,7 +395,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 				nextLogSync = time.Until(rows[0].Time.AsTime().Add(time.Second))
 			}
 			select {
-			case obj, ok = <-aserver.TraceLog:
+			case obj, ok = <-actionsHttpServerHandler.TraceLog:
 			case <-time.After(nextLogSync):
 				if taskStateChanged && updateTask(reportingCtx, t, taskState, cancel, nil) == nil {
 					taskStateChanged = false
@@ -591,14 +591,14 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	}
 	_, workerV2 := workerOptions["--worker-v2"]
 
-	var httpServer *http.Server
+	var actionsHttpServer *http.Server
 	if !workerV2 {
-		httpServer = &http.Server{Handler: aserver}
+		actionsHttpServer = &http.Server{Handler: actionsHttpServerHandler}
 	}
 
 	defer func() {
-		if httpServer != nil {
-			httpServer.Shutdown(context.Background())
+		if actionsHttpServer != nil {
+			actionsHttpServer.Shutdown(context.Background())
 		}
 		message := "Finished"
 		log.Info(message)
@@ -681,10 +681,10 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		externalURL = fmt.Sprintf("http://%s:%d/", hostname, listener.Addr().(*net.TCPAddr).Port)
 	}
 	// Normalize externalURL to ensure it ends with a slash
-	aserver.ExternalURL = strings.TrimSuffix(externalURL, "/") + "/"
+	actionsHttpServerHandler.ExternalURL = strings.TrimSuffix(externalURL, "/") + "/"
 
 	cacheServerUrl := os.Getenv("GITEA_ACTIONS_CACHE_SERVER_URL")
-	if httpServer != nil && cacheServerUrl == "" {
+	if actionsHttpServer != nil && cacheServerUrl == "" {
 		if wd, err := os.Getwd(); err == nil {
 			if actionsRuntimeListeningAddr == ":0" {
 				if cache, err := artifactcache.StartHandler(filepath.Join(wd, "cache"), hostname, 0, log.New()); err == nil {
@@ -692,7 +692,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					defer cache.Close()
 				}
 			} else {
-				_, aserver.CacheHandler, _ = artifactcache.CreateHandler(filepath.Join(wd, "cache"), externalURL, nil)
+				_, actionsHttpServerHandler.CacheHandler, _ = artifactcache.CreateHandler(filepath.Join(wd, "cache"), externalURL, nil)
 				cacheServerUrl = externalURL
 			}
 		}
@@ -701,9 +701,9 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	if cacheServerUrl != "" {
 		cacheServerUrl = strings.TrimSuffix(cacheServerUrl, "/") + "/"
 	}
-	if httpServer != nil {
+	if actionsHttpServer != nil {
 		go func() {
-			httpServer.Serve(listener)
+			actionsHttpServer.Serve(listener)
 		}()
 	}
 
@@ -764,7 +764,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 						re := strings.Split(strings.TrimPrefix(nameAndPathOrRef[0], proto), "/")
 						nameAndPath = append([]string{strings.ReplaceAll(proto+re[0]+"/"+re[1], ":", "~")}, re[2:]...)
 						if token != "" {
-							aserver.AuthData[nameAndPathOrRef[0]] = &protocol.ActionDownloadAuthentication{
+							actionsHttpServerHandler.AuthData[nameAndPathOrRef[0]] = &protocol.ActionDownloadAuthentication{
 								Token: token,
 							}
 						}
@@ -1023,8 +1023,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		jmessage.Variables[k] = protocol.VariableValue{Value: v, IsSecret: true}
 	}
 
-	aserver.JobRequest = jmessage
-	aserver.CancelCtx = ctx
+	actionsHttpServerHandler.JobRequest = jmessage
+	actionsHttpServerHandler.CancelCtx = ctx
 	src, _ := json.Marshal(jmessage)
 	jobExecCtx := ctx
 
@@ -1058,7 +1058,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 	var workerLog *bytes.Buffer
 	if workerV2 {
 		go func() {
-			server.Server(server.CreateStdioConn(out, in), aserver)
+			server.Server(server.CreateStdioConn(out, in), actionsHttpServerHandler)
 		}()
 	} else {
 		mid := make([]byte, 4)

@@ -65,5 +65,5 @@ func (p *Register) Register(ctx context.Context, cfg config.Runner) (*core.Runne
 	}
 
 	// store runner config in .runner file
-	return data, os.WriteFile(cfg.File, file, 0o644)
+	return data, os.WriteFile(cfg.File, file, 0o640)
 }

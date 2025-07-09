@@ -94,7 +94,7 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 	}
 	jsonResponse := func(data interface{}) {
 		resp.Header().Add("content-type", "application/json")
-		resp.WriteHeader(200)
+		resp.WriteHeader(http.StatusOK)
 		json, _ := json.Marshal(data)
 		resp.Write(json)
 	}
@@ -118,16 +118,16 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/FinishJob") {
 		recs := &protocol.JobEvent{}
 		jsonRequest(recs)
-		resp.WriteHeader(200)
+		resp.WriteHeader(http.StatusOK)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/TimeLineWebConsoleLog/") {
 		recs := &protocol.TimelineRecordFeedLinesWrapper{}
 		jsonRequest(recs)
-		resp.WriteHeader(200)
+		resp.WriteHeader(http.StatusOK)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/Logfiles") {
 		logPath := "/_apis/v1/Logfiles/"
 		if strings.HasPrefix(req.URL.Path, logPath) && len(logPath) < len(req.URL.Path) {
 			io.Copy(io.Discard, req.Body)
-			resp.WriteHeader(200)
+			resp.WriteHeader(http.StatusOK)
 		} else {
 			p := "logs\\0.log"
 			recs := &protocol.TaskLog{
@@ -223,14 +223,14 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/ActionDownload") {
 		req, err := http.NewRequestWithContext(req.Context(), "GET", req.URL.Query().Get("url"), nil)
 		if err != nil {
-			resp.WriteHeader(404)
+			resp.WriteHeader(http.StatusNotFound)
 			return
 		}
 		req.Header.Add("User-Agent", "github-act-runner/1.0.0")
 		req.Header.Add("Accept", "*/*")
 		rsp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			resp.WriteHeader(404)
+			resp.WriteHeader(http.StatusNotFound)
 			return
 		}
 		defer rsp.Body.Close()
@@ -245,7 +245,7 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		defer req.Body.Close()
 		myreq, err := http.NewRequestWithContext(req.Context(), req.Method, url.String(), req.Body)
 		if err != nil {
-			resp.WriteHeader(404)
+			resp.WriteHeader(http.StatusNotFound)
 			return
 		}
 		for k, vs := range req.Header {
@@ -253,7 +253,7 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		}
 		rsp, err := http.DefaultClient.Do(myreq)
 		if err != nil {
-			resp.WriteHeader(404)
+			resp.WriteHeader(http.StatusNotFound)
 			return
 		}
 		defer rsp.Body.Close()
@@ -264,7 +264,7 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		resp.WriteHeader(rsp.StatusCode)
 		io.Copy(resp, rsp.Body)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/ActionDownload") {
-		resp.WriteHeader(404)
+		resp.WriteHeader(http.StatusNotFound)
 	} else if strings.HasPrefix(req.URL.Path, "/JobRequest") {
 		SYSTEMVSSCONNECTION := req.URL.Query().Get("SYSTEMVSSCONNECTION")
 		// Normalize the URL to ensure it ends with a slash
@@ -289,7 +289,7 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 				}
 			}
 		}
-		resp.WriteHeader(200)
+		resp.WriteHeader(http.StatusOK)
 		resp.Header().Add("content-type", "application/json")
 		resp.Header().Add("accept", "application/json")
 		src, _ := json.Marshal(server.JobRequest)
@@ -297,7 +297,7 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 	} else if strings.HasPrefix(req.URL.Path, "/WaitForCancellation") {
 		resp.Header().Add("content-type", "application/json")
 		resp.Header().Add("accept", "application/json")
-		resp.WriteHeader(200)
+		resp.WriteHeader(http.StatusOK)
 		resp.(http.Flusher).Flush()
 		for {
 			select {
@@ -317,6 +317,6 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 	} else if server.CacheHandler != nil {
 		server.CacheHandler.ServeHTTP(resp, req)
 	} else {
-		resp.WriteHeader(404)
+		resp.WriteHeader(http.StatusNotFound)
 	}
 }
