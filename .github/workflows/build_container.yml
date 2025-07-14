@@ -30,6 +30,10 @@ jobs:
           tag-prefix: ubuntu-jammy-
         - file: Dockerfile.medium
           build-args: |
+            BASE_IMAGE=catthehacker/ubuntu:act-24.04
+          tag-prefix: ubuntu-noble-
+        - file: Dockerfile.medium
+          build-args: |
             BASE_IMAGE=catthehacker/ubuntu:act-latest
           tag-prefix: ubuntu-
     permissions:
