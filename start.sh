@@ -21,6 +21,11 @@ if [[ -z "${GITEA_RUNNER_REGISTRATION_TOKEN}" ]] && [[ -f "${GITEA_RUNNER_REGIST
   GITEA_RUNNER_REGISTRATION_TOKEN=$(cat "${GITEA_RUNNER_REGISTRATION_TOKEN_FILE}")
 fi
 
+if [[ ! -z "${GITEA_RUNNER_PAT}" ]]; then
+  GITEA_RUNNER_REGISTRATION_TOKEN="$(curl -s -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GITEA_RUNNER_PAT}" ${GITEA_INSTANCE_URL}/api/v1/repos/${GITEA_RUNNER_OWNER}/${GITEA_RUNNER_REPO}/actions/runners/registration-token | jq .token -r)"
+  unset GITEA_RUNNER_PAT
+fi
+
 # Use the same ENV variable names as https://github.com/vegardit/docker-gitea-act-runner
 test -f "$RUNNER_STATE_FILE" || echo "$RUNNER_STATE_FILE is missing or not a regular file"
 
