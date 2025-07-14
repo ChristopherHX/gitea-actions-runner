@@ -12,8 +12,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const ActionsRunnerVersion string = "2.323.0"
-const RunnerServerRunnerVersion string = "3.13.3"
+// https://github.com/actions/runner/releases
+const ActionsRunnerVersion string = "2.326.0"
+// https://github.com/christopherHX/runner.server/releases
+const RunnerServerRunnerVersion string = "3.13.4"
 
 //go:embed actions-runner-worker.py
 var pythonWorkerScript string

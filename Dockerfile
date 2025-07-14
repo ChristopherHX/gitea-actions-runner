@@ -4,10 +4,14 @@ FROM mcr.microsoft.com/dotnet/runtime-deps:6.0-jammy as build
 
 ARG TARGETOS
 ARG TARGETARCH
-ARG RUNNER_VERSION=2.323.0
+# https://github.com/actions/runner/releases
+ARG RUNNER_VERSION=2.326.0
+# https://github.com/actions/runner-container-hooks/releases
 ARG RUNNER_CONTAINER_HOOKS_VERSION=0.7.0
-ARG DOCKER_VERSION=27.5.1
-ARG BUILDX_VERSION=0.20.1
+# https://github.com/moby/moby/releases
+ARG DOCKER_VERSION=28.3.2
+# https://github.com/docker/buildx/releases
+ARG BUILDX_VERSION=0.25.0
 
 RUN apt update -y && apt install curl unzip -y
 
