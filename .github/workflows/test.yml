@@ -31,6 +31,17 @@ jobs:
             auto_init: true,
             default_branch: 'main',
           })
+          await github.request("POST /repos/{owner}/{repo}/contents/{path}", {
+            owner: "test01",
+            repo: "test-repo",
+            path: 'action.yml',
+            message: 'Add test workflow',
+            branch: 'main',
+            content: Buffer.from(`runs:
+            using: composite
+              steps:`).toString('base64'),
+          });
+
           // Create new file in the repository
           await github.request("POST /repos/{owner}/{repo}/contents/{path}", {
             owner: "test01",
