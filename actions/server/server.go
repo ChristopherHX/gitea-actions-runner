@@ -234,6 +234,10 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 			return
 		}
 		defer rsp.Body.Close()
+
+		for k, vs := range rsp.Header {
+			resp.Header()[k] = vs
+		}
 		resp.WriteHeader(rsp.StatusCode)
 		io.Copy(resp, rsp.Body)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/pipelines/workflows/") {
