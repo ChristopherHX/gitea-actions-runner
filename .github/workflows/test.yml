@@ -2,6 +2,7 @@ on:
   push:
     branches:
     - main
+  pull_request:
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -43,7 +44,7 @@ jobs:
               runs-on: ubuntu-latest
               steps:
               - name: Checkout code
-                uses: actions/checkout@v4
+                uses: test01/test-repo@main
               - name: Run tests
                 run: echo "Running tests..."`).toString('base64'),
           });
