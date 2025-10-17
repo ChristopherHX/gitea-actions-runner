@@ -194,7 +194,7 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 						resolved.TarballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
 						resolved.ZipballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
 					}
-					testResp, err := http.Get(resolved.TarballUrl)
+					testResp, err := http.Head(resolved.TarballUrl)
 					if err == nil {
 						testResp.Body.Close()
 						if testResp.StatusCode >= 200 && testResp.StatusCode < 300 {
