@@ -48,8 +48,8 @@ jobs:
               - name: Run tests
                 run: echo "Running tests..."`).toString('base64'),
           });
-          await exec.exec(`${process.env.RUNNER_BIN} register --instance http://localhost:${{ env.GITEA_PORT }} --token ${process.env.RUNNER_TOKEN} --name test-runner --labels ubuntu-latest --no-interactive --ephemeral --type 2`);
-          await exec.exec(`${process.env.RUNNER_BIN} daemon`);
+          await exec.exec(`${process.env.RUNNER_BIN} register --instance http://localhost:${{ env.GITEA_PORT }} --token ${process.env.RUNNER_TOKEN} --name test-runner --labels ubuntu-latest --no-interactive --type 2`);
+          await exec.exec(`${process.env.RUNNER_BIN} daemon --once`);
 
           await github.rest.repos.listCommitStatusesForRef({
             owner: "test01",
