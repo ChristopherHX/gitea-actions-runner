@@ -97,6 +97,8 @@ jobs:
             branch: "main",
           });
 
+          var hasFailures = false;
+
           for (const run of runs.data.workflow_runs) {
             console.log(`Workflow Run: ${run.id}`);
 
@@ -106,6 +108,7 @@ jobs:
               repo: "test-repo",
               run_id: run.id,
             });
+            hasFailures ||= jobs.data.jobs.some(job => job.status == 'completed' && job.conclusion !== 'success' && job.conclusion !== 'skipped');
             for (const job of jobs.data.jobs) {
               console.log(`Job: ${job.id}, Name: ${job.name}, Status: ${job.status}, Conclusion: ${job.conclusion}`);
               if(job.status !== 'completed') {
@@ -126,7 +129,6 @@ jobs:
               }
             }
           }
-          const hasFailures = jobs.data.jobs.some(job => job.status == 'completed' && job.conclusion !== 'success' && job.conclusion !== 'skipped');
           if (hasFailures) {
             throw new Error('Some jobs have failed.');
           }
