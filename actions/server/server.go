@@ -364,6 +364,8 @@ func checkAuth(token string, resolved *protocol.ActionDownloadInfo, url string, 
 			for k, v := range testResp.Header {
 				logrus.Errorf("Header: %s: %s", k, strings.Join(v, ", "))
 			}
+		} else {
+			logrus.Infof("Auth check succeeded for %s with status %d", resolved.TarballUrl, testResp.StatusCode)
 		}
 		return ok
 	}
