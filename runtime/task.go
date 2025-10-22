@@ -629,7 +629,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 				if len(rows) > 0 {
 					return fmt.Errorf("still logs missing")
 				}
-			} else if connectErr, ok := err.(*connect.Error); ok && connectErr.Code() == connect.CodeUnauthenticated {
+			} else if strings.Contains(err.Error(), "Unauthenticated") {
 				log.Errorf("failed to update log: %v, has been removed", err)
 				return nil
 			} else {
