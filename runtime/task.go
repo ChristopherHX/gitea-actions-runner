@@ -348,6 +348,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		ServerURL:        dataContext["server_url"].GetStringValue(),
 		ActionsServerURL: dataContext["gitea_default_actions_url"].GetStringValue(),
 		AuthData:         map[string]*protocol.ActionDownloadAuthentication{},
+		Token:            preset.Token,
 	}
 	defer func() {
 		close(actionsHttpServerHandler.TraceLog)

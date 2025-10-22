@@ -25,6 +25,7 @@ type ActionsServer struct {
 	CancelCtx        context.Context
 	CacheHandler     http.Handler
 	ExternalURL      string
+	Token            string
 }
 
 func ToPipelineContextDataWithError(data interface{}) (protocol.PipelineContextData, error) {
@@ -186,15 +187,10 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 					urls = []string{server.ActionsServerURL}
 				}
 				for _, url := range urls {
+					// Gitea Actions Token currently does not work for public repositories
+					// Try noauth first and check with token
 					noAuth = url != server.ServerURL
-					if noAuth {
-						resolved.TarballUrl = fmt.Sprintf("%s/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
-						resolved.ZipballUrl = fmt.Sprintf("%s/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
-					} else {
-						resolved.TarballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
-						resolved.ZipballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
-					}
-					if resp, err := http.Head(resolved.TarballUrl); err == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+					if checkAuth("", resolved, url, ref) || !noAuth && checkAuth(server.Token, resolved, url, ref) {
 						break
 					}
 				}
@@ -319,4 +315,34 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 	} else {
 		resp.WriteHeader(http.StatusNotFound)
 	}
+}
+
+func checkAuth(token string, resolved protocol.ActionDownloadInfo, url string, ref protocol.ActionReference) bool {
+	if token == "" {
+		resolved.TarballUrl = fmt.Sprintf("%s/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+		resolved.ZipballUrl = fmt.Sprintf("%s/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+	} else {
+		resolved.TarballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+		resolved.ZipballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
+	}
+	req, err := http.NewRequest(http.MethodHead, resolved.TarballUrl, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Add("User-Agent", "github-act-runner/1.0.0")
+	req.Header.Add("Accept", "*/*")
+	if token != "" {
+		req.SetBasicAuth("x-access-token", token)
+	}
+	testResp, err := client.Do(req)
+	if err == nil {
+		testResp.Body.Close()
+		return testResp.StatusCode >= 200 && testResp.StatusCode < 300
+	}
+	return false
 }
