@@ -26,6 +26,26 @@ jobs:
       with:
         script: |
           await github.rest.repos.createForAuthenticatedUser({
+            name: 'action-repo',
+            private: true,
+            auto_init: true,
+            default_branch: 'main',
+          })
+          // Create new file in the repository
+          await github.request("POST /repos/{owner}/{repo}/contents/{path}", {
+            owner: "test01",
+            repo: "action-repo",
+            path: 'action.yml',
+            message: 'Add action',
+            branch: 'main',
+            content: Buffer.from(`on: push
+          runs:
+            using: composite
+            steps:
+            - run: echo OK`).toString('base64'),
+          });
+
+          await github.rest.repos.createForAuthenticatedUser({
             name: 'test-repo',
             private: true,
             auto_init: true,
@@ -44,12 +64,14 @@ jobs:
               runs-on: ubuntu-latest
               steps:
               - name: Checkout code
-                uses: test01/test-repo@main
+                uses: actions/checkout@v5
+              - name: Run instance local action
+                uses: test01/action-repo@main
               - name: Run tests
                 run: echo "Running tests..."`).toString('base64'),
           });
-          await exec.exec(`${process.env.RUNNER_BIN} register --instance http://localhost:${{ env.GITEA_PORT }} --token ${process.env.RUNNER_TOKEN} --name test-runner --labels ubuntu-latest --no-interactive --ephemeral --type 2`);
-          await exec.exec(`${process.env.RUNNER_BIN} daemon`);
+          await exec.exec(`${process.env.RUNNER_BIN} register --instance http://localhost:${{ env.GITEA_PORT }} --token ${process.env.RUNNER_TOKEN} --name test-runner --labels ubuntu-latest --no-interactive --type 2`);
+          await exec.exec(`${process.env.RUNNER_BIN} daemon --once`);
 
           await github.rest.repos.listCommitStatusesForRef({
             owner: "test01",
