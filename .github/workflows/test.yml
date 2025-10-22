@@ -77,7 +77,7 @@ jobs:
               runs-on: ubuntu-latest
               steps:
               - name: Checkout code
-                uses: actions/checkout@v5
+                uses: actions/checkout@v4
               - name: Run instance public local action
                 uses: test01/action-repo@main
               - name: Run self private local action
