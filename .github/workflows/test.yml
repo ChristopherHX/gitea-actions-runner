@@ -55,6 +55,19 @@ jobs:
           await github.request("POST /repos/{owner}/{repo}/contents/{path}", {
             owner: "test01",
             repo: "test-repo",
+            path: 'action.yml',
+            message: 'Add action',
+            branch: 'main',
+            content: Buffer.from(`on: push
+          runs:
+            using: composite
+            steps:
+            - run: echo OK`).toString('base64'),
+          });
+          // Create new file in the repository
+          await github.request("POST /repos/{owner}/{repo}/contents/{path}", {
+            owner: "test01",
+            repo: "test-repo",
             path: '.github/workflows/test.yml',
             message: 'Add test workflow',
             branch: 'main',
@@ -65,8 +78,10 @@ jobs:
               steps:
               - name: Checkout code
                 uses: actions/checkout@v5
-              - name: Run instance local action
+              - name: Run instance public local action
                 uses: test01/action-repo@main
+              - name: Run self private local action
+                uses: test01/test-repo@main
               - name: Run tests
                 run: echo "Running tests..."`).toString('base64'),
           });
