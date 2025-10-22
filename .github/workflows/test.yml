@@ -26,11 +26,46 @@ jobs:
       with:
         script: |
           await github.rest.repos.createForAuthenticatedUser({
+            name: 'action-repo',
+            private: false,
+            auto_init: true,
+            default_branch: 'main',
+          })
+          // Create new file in the repository
+          await github.request("POST /repos/{owner}/{repo}/contents/{path}", {
+            owner: "test01",
+            repo: "action-repo",
+            path: 'action.yml',
+            message: 'Add action',
+            branch: 'main',
+            content: Buffer.from(`on: push
+          runs:
+            using: composite
+            steps:
+            - run: echo OK
+              shell: bash`).toString('base64'),
+          });
+
+          await github.rest.repos.createForAuthenticatedUser({
             name: 'test-repo',
             private: true,
             auto_init: true,
             default_branch: 'main',
           })
+          // Create new file in the repository
+          await github.request("POST /repos/{owner}/{repo}/contents/{path}", {
+            owner: "test01",
+            repo: "test-repo",
+            path: 'action.yml',
+            message: 'Add action',
+            branch: 'main',
+            content: Buffer.from(`on: push
+          runs:
+            using: composite
+            steps:
+            - run: echo OK
+              shell: bash`).toString('base64'),
+          });
           // Create new file in the repository
           await github.request("POST /repos/{owner}/{repo}/contents/{path}", {
             owner: "test01",
@@ -44,26 +79,59 @@ jobs:
               runs-on: ubuntu-latest
               steps:
               - name: Checkout code
+                uses: actions/checkout@v5
+              - name: Run instance public local action
+                uses: test01/action-repo@main
+              - name: Run self private local action
                 uses: test01/test-repo@main
               - name: Run tests
                 run: echo "Running tests..."`).toString('base64'),
           });
-          await exec.exec(`${process.env.RUNNER_BIN} register --instance http://localhost:${{ env.GITEA_PORT }} --token ${process.env.RUNNER_TOKEN} --name test-runner --labels ubuntu-latest --no-interactive --ephemeral --type 2`);
-          await exec.exec(`${process.env.RUNNER_BIN} daemon`);
-
-          await github.rest.repos.listCommitStatusesForRef({
+          await exec.exec(`${process.env.RUNNER_BIN} register --instance http://localhost:${{ env.GITEA_PORT }} --token ${process.env.RUNNER_TOKEN} --name test-runner --labels ubuntu-latest --no-interactive --type 2`);
+          await exec.exec(`${process.env.RUNNER_BIN} daemon --once`);
+          
+          // List all workflow runs
+          const runs = await github.rest.actions.listWorkflowRunsForRepo({
             owner: "test01",
             repo: "test-repo",
-            ref: "main"
-          }).then((response) => {
-            console.log(response.data);
-            if (response.data.filter(status => status.status !== 'pending' && status.status != 'success').length === 0) {
-              console.log('Test passed');
-            } else {
-              console.log('Test failed');
-              throw new Error('Test failed');
-            }
+            branch: "main",
           });
+
+          var hasFailures = false;
+
+          for (const run of runs.data.workflow_runs) {
+            console.log(`Workflow Run: ${run.id}`);
+
+            // List all jobs for the workflow run
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({
+              owner: "test01",
+              repo: "test-repo",
+              run_id: run.id,
+            });
+            hasFailures ||= jobs.data.jobs.some(job => job.status == 'completed' && job.conclusion !== 'success' && job.conclusion !== 'skipped');
+            for (const job of jobs.data.jobs) {
+              console.log(`Job: ${job.id}, Name: ${job.name}, Status: ${job.status}, Conclusion: ${job.conclusion}`);
+              if(job.status !== 'completed') {
+                continue;
+              }
+              try {
+                // Download logs for the job
+                const logResponse = await github.rest.actions.downloadJobLogsForWorkflowRun({
+                  owner: "test01",
+                  repo: "test-repo",
+                  job_id: job.id,
+                });
+
+                console.log(`Logs for Job ${job.id}:`);
+                console.log(logResponse.data);
+              } catch (err) {
+                console.error(`Failed to download logs for Job ${job.id}: ${err}`);
+              }
+            }
+          }
+          if (hasFailures) {
+            throw new Error('Some jobs have failed.');
+          }
         github-token: ${{ env.TOKEN }}
         base-url: "http://localhost:${{ env.GITEA_PORT }}/api/v1"
       env:

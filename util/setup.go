@@ -13,9 +13,10 @@ import (
 )
 
 // https://github.com/actions/runner/releases
-const ActionsRunnerVersion string = "2.326.0"
+const ActionsRunnerVersion string = "2.329.0"
+
 // https://github.com/christopherHX/runner.server/releases
-const RunnerServerRunnerVersion string = "3.13.4"
+const RunnerServerRunnerVersion string = "3.13.7"
 
 //go:embed actions-runner-worker.py
 var pythonWorkerScript string

@@ -14,6 +14,7 @@ import (
 
 	"github.com/ChristopherHX/github-act-runner/protocol"
 	"github.com/actions-oss/act-cli/pkg/artifactcache"
+	"github.com/sirupsen/logrus"
 )
 
 type ActionsServer struct {
@@ -25,6 +26,7 @@ type ActionsServer struct {
 	CancelCtx        context.Context
 	CacheHandler     http.Handler
 	ExternalURL      string
+	Token            string
 }
 
 func ToPipelineContextDataWithError(data interface{}) (protocol.PipelineContextData, error) {
@@ -186,19 +188,18 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 					urls = []string{server.ActionsServerURL}
 				}
 				for _, url := range urls {
+					// Gitea Actions Token currently does not work for public repositories
+					// Try noauth first and check with token
 					noAuth = url != server.ServerURL
-					if noAuth {
-						resolved.TarballUrl = fmt.Sprintf("%s/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
-						resolved.ZipballUrl = fmt.Sprintf("%s/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
-					} else {
-						resolved.TarballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
-						resolved.ZipballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
-					}
-					if resp, err := http.Head(resolved.TarballUrl); err == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+					if checkAuth("", &resolved, url, ref) {
+						noAuth = true
+						break
+					} else if !noAuth && checkAuth(server.Token, &resolved, url, ref) {
 						break
 					}
 				}
 			}
+			logrus.Infof("Current result: %s at %s and %s", resolved.NameWithOwner, resolved.TarballUrl, resolved.ZipballUrl)
 			if noAuth {
 				// Using a dummy token has worked in 2022, but now it's broken
 				// resolved.Authentication = &protocol.ActionDownloadAuthentication{
@@ -216,12 +217,15 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 				resolved.ZipballUrl = dst.String()
 			}
 			actions[fmt.Sprintf("%s@%s", ref.NameWithOwner, ref.Ref)] = resolved
+			logrus.Infof("Resolved action: %s at %s and %s", resolved.NameWithOwner, resolved.TarballUrl, resolved.ZipballUrl)
 		}
 		jsonResponse(&protocol.ActionDownloadInfoCollection{
 			Actions: actions,
 		})
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/ActionDownload") {
-		req, err := http.NewRequestWithContext(req.Context(), "GET", req.URL.Query().Get("url"), nil)
+		requestedURL := req.URL.Query().Get("url")
+		logrus.Infof("Action download requested for URL: %s", requestedURL)
+		req, err := http.NewRequestWithContext(req.Context(), "GET", requestedURL, nil)
 		if err != nil {
 			resp.WriteHeader(http.StatusNotFound)
 			return
@@ -234,6 +238,11 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 			return
 		}
 		defer rsp.Body.Close()
+		logrus.Infof("Action download http code for URL: %s %d", requestedURL, rsp.StatusCode)
+		// Forward headers
+		for k, vs := range rsp.Header {
+			resp.Header()[k] = vs
+		}
 		resp.WriteHeader(rsp.StatusCode)
 		io.Copy(resp, rsp.Body)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/pipelines/workflows/") {
@@ -319,4 +328,46 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 	} else {
 		resp.WriteHeader(http.StatusNotFound)
 	}
+}
+
+func checkAuth(token string, resolved *protocol.ActionDownloadInfo, url string, ref protocol.ActionReference) bool {
+	if token == "" {
+		resolved.TarballUrl = fmt.Sprintf("%s/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+		resolved.ZipballUrl = fmt.Sprintf("%s/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+	} else {
+		resolved.TarballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+		resolved.ZipballUrl = fmt.Sprintf("%s/api/v1/repos/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
+	}
+	req, err := http.NewRequest(http.MethodHead, resolved.TarballUrl, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Add("User-Agent", "github-act-runner/1.0.0")
+	req.Header.Add("Accept", "*/*")
+	if token != "" {
+		req.SetBasicAuth("x-access-token", token)
+	}
+	testResp, err := client.Do(req)
+	if err == nil {
+		defer testResp.Body.Close()
+		ok := testResp.StatusCode >= 200 && testResp.StatusCode < 300
+		if !ok {
+			logrus.Errorf("Auth check failed for %s with status %d", resolved.TarballUrl, testResp.StatusCode)
+			resp, _ := io.ReadAll(testResp.Body)
+			logrus.Errorf("Response: %s", string(resp))
+			// log headers for debugging
+			for k, v := range testResp.Header {
+				logrus.Errorf("Header: %s: %s", k, strings.Join(v, ", "))
+			}
+		} else {
+			logrus.Infof("Auth check succeeded for %s with status %d", resolved.TarballUrl, testResp.StatusCode)
+		}
+		return ok
+	}
+	return false
 }
