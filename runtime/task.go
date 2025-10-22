@@ -416,6 +416,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					}
 				} else if strings.Contains(err.Error(), "Unauthenticated") {
 					log.Errorf("failed to update log: %v, has been removed", err)
+					rows = []*runnerv1.LogRow{}
 				} else {
 					log.Errorf("failed to update log: %v, batching later", err)
 				}
