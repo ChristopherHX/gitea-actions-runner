@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -619,7 +618,6 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 				Rows:   rows,
 				NoMore: true,
 			}))
-			var connectErr *connect.Error
 			if err == nil {
 				diff := res.Msg.GetAckIndex() - sentLogline
 				sentLogline = res.Msg.GetAckIndex()
@@ -631,7 +629,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 				if len(rows) > 0 {
 					return fmt.Errorf("still logs missing")
 				}
-			} else if errors.As(err, &connectErr) && connectErr.Code() == connect.CodeUnauthenticated {
+			} else if connectErr, ok := err.(*connect.Error); ok && connectErr.Code() == connect.CodeUnauthenticated {
 				log.Errorf("failed to update log: %v, has been removed", err)
 				return nil
 			} else {
