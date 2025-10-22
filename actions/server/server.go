@@ -239,6 +239,10 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 		}
 		defer rsp.Body.Close()
 		logrus.Infof("Action download http code for URL: %s %d", requestedURL, rsp.StatusCode)
+		// Forward headers
+		for k, vs := range rsp.Header {
+			resp.Header()[k] = vs
+		}
 		resp.WriteHeader(rsp.StatusCode)
 		io.Copy(resp, rsp.Body)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/pipelines/workflows/") {
