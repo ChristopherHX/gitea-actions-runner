@@ -14,6 +14,7 @@ import (
 
 	"github.com/ChristopherHX/github-act-runner/protocol"
 	"github.com/actions-oss/act-cli/pkg/artifactcache"
+	"github.com/sirupsen/logrus"
 )
 
 type ActionsServer struct {
@@ -341,8 +342,18 @@ func checkAuth(token string, resolved protocol.ActionDownloadInfo, url string, r
 	}
 	testResp, err := client.Do(req)
 	if err == nil {
-		testResp.Body.Close()
-		return testResp.StatusCode >= 200 && testResp.StatusCode < 300
+		ok := testResp.StatusCode >= 200 && testResp.StatusCode < 300
+		if !ok {
+			logrus.Errorf("Auth check failed for %s with status %d", resolved.TarballUrl, testResp.StatusCode)
+			resp, _ := io.ReadAll(testResp.Body)
+			logrus.Errorf("Response: %s", string(resp))
+			// log headers for debugging
+			for k, v := range testResp.Header {
+				logrus.Errorf("Header: %s: %s", k, strings.Join(v, ", "))
+			}
+		} else {
+			testResp.Body.Close()
+		}
 	}
 	return false
 }
