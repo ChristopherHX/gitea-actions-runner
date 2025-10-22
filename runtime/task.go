@@ -414,6 +414,8 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					} else if diff > 0 {
 						rows = rows[diff:]
 					}
+				} else if strings.Contains(err.Error(), "Unauthenticated") {
+					log.Errorf("failed to update log: %v, has been removed", err)
 				} else {
 					log.Errorf("failed to update log: %v, batching later", err)
 				}
@@ -630,10 +632,10 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					return fmt.Errorf("still logs missing")
 				}
 			} else if strings.Contains(err.Error(), "Unauthenticated") {
-				log.Errorf("failed to update log: %v, has been removed", err)
+				log.Errorf("final failed to update log: %v, has been removed", err)
 				return nil
 			} else {
-				log.Errorf("failed to update log: %v, batching later", err)
+				log.Errorf("final failed to update log: %v, batching later", err)
 			}
 			return err
 		}, retry.Context(reportingCtx))
