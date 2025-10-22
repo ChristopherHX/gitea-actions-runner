@@ -42,7 +42,8 @@ jobs:
           runs:
             using: composite
             steps:
-            - run: echo OK`).toString('base64'),
+            - run: echo OK
+              shell: bash`).toString('base64'),
           });
 
           await github.rest.repos.createForAuthenticatedUser({
@@ -62,7 +63,8 @@ jobs:
           runs:
             using: composite
             steps:
-            - run: echo OK`).toString('base64'),
+            - run: echo OK
+              shell: bash`).toString('base64'),
           });
           // Create new file in the repository
           await github.request("POST /repos/{owner}/{repo}/contents/{path}", {
@@ -77,7 +79,7 @@ jobs:
               runs-on: ubuntu-latest
               steps:
               - name: Checkout code
-                uses: actions/checkout@v4
+                uses: actions/checkout@v5
               - name: Run instance public local action
                 uses: test01/action-repo@main
               - name: Run self private local action
@@ -104,9 +106,11 @@ jobs:
               repo: "test-repo",
               run_id: run.id,
             });
-
             for (const job of jobs.data.jobs) {
-              console.log(`Job: ${job.id}, Name: ${job.name}`);
+              console.log(`Job: ${job.id}, Name: ${job.name}, Status: ${job.status}, Conclusion: ${job.conclusion}`);
+              if(job.status !== 'completed') {
+                continue;
+              }
               try {
                 // Download logs for the job
                 const logResponse = await github.rest.actions.downloadJobLogsForWorkflowRun({
@@ -122,20 +126,10 @@ jobs:
               }
             }
           }
-
-          await github.rest.repos.listCommitStatusesForRef({
-            owner: "test01",
-            repo: "test-repo",
-            ref: "main"
-          }).then((response) => {
-            console.log(response.data);
-            if (response.data.filter(status => status.status !== 'pending' && status.status != 'success').length === 0) {
-              console.log('Test passed');
-            } else {
-              console.log('Test failed');
-              throw new Error('Test failed');
-            }
-          });
+          const hasFailures = jobs.data.jobs.some(job => job.status == 'completed' && job.conclusion !== 'success' && job.conclusion !== 'skipped');
+          if (hasFailures) {
+            throw new Error('Some jobs have failed.');
+          }
         github-token: ${{ env.TOKEN }}
         base-url: "http://localhost:${{ env.GITEA_PORT }}/api/v1"
       env:
