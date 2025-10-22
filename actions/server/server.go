@@ -191,10 +191,10 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 					// Gitea Actions Token currently does not work for public repositories
 					// Try noauth first and check with token
 					noAuth = url != server.ServerURL
-					if checkAuth("", resolved, url, ref) {
+					if checkAuth("", &resolved, url, ref) {
 						noAuth = true
 						break
-					} else if !noAuth && checkAuth(server.Token, resolved, url, ref) {
+					} else if !noAuth && checkAuth(server.Token, &resolved, url, ref) {
 						break
 					}
 				}
@@ -326,7 +326,7 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 	}
 }
 
-func checkAuth(token string, resolved protocol.ActionDownloadInfo, url string, ref protocol.ActionReference) bool {
+func checkAuth(token string, resolved *protocol.ActionDownloadInfo, url string, ref protocol.ActionReference) bool {
 	if token == "" {
 		resolved.TarballUrl = fmt.Sprintf("%s/%s/archive/%s.tar.gz", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
 		resolved.ZipballUrl = fmt.Sprintf("%s/%s/archive/%s.zip", strings.TrimRight(url, "/"), ref.NameWithOwner, ref.Ref)
