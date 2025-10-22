@@ -365,6 +365,7 @@ func checkAuth(token string, resolved *protocol.ActionDownloadInfo, url string, 
 				logrus.Errorf("Header: %s: %s", k, strings.Join(v, ", "))
 			}
 		}
+		return ok
 	}
 	return false
 }
