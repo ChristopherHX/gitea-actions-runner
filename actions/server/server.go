@@ -191,7 +191,10 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 					// Gitea Actions Token currently does not work for public repositories
 					// Try noauth first and check with token
 					noAuth = url != server.ServerURL
-					if checkAuth("", resolved, url, ref) || !noAuth && checkAuth(server.Token, resolved, url, ref) {
+					if checkAuth("", resolved, url, ref) {
+						noAuth = true
+						break
+					} else if !noAuth && checkAuth(server.Token, resolved, url, ref) {
 						break
 					}
 				}
@@ -342,6 +345,7 @@ func checkAuth(token string, resolved protocol.ActionDownloadInfo, url string, r
 	}
 	testResp, err := client.Do(req)
 	if err == nil {
+		defer testResp.Body.Close()
 		ok := testResp.StatusCode >= 200 && testResp.StatusCode < 300
 		if !ok {
 			logrus.Errorf("Auth check failed for %s with status %d", resolved.TarballUrl, testResp.StatusCode)
@@ -351,8 +355,6 @@ func checkAuth(token string, resolved protocol.ActionDownloadInfo, url string, r
 			for k, v := range testResp.Header {
 				logrus.Errorf("Header: %s: %s", k, strings.Join(v, ", "))
 			}
-		} else {
-			testResp.Body.Close()
 		}
 	}
 	return false
