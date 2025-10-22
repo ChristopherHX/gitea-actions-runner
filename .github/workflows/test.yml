@@ -27,7 +27,7 @@ jobs:
         script: |
           await github.rest.repos.createForAuthenticatedUser({
             name: 'action-repo',
-            private: true,
+            private: false,
             auto_init: true,
             default_branch: 'main',
           })
