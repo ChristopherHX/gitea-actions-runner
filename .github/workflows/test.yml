@@ -88,6 +88,40 @@ jobs:
           await exec.exec(`${process.env.RUNNER_BIN} register --instance http://localhost:${{ env.GITEA_PORT }} --token ${process.env.RUNNER_TOKEN} --name test-runner --labels ubuntu-latest --no-interactive --type 2`);
           await exec.exec(`${process.env.RUNNER_BIN} daemon --once`);
 
+          // TODO list all runs then list all jobs then download logs for each job to verify the actions ran correctly
+          
+          // List all workflow runs
+          const runs = await github.rest.actions.listWorkflowRunsForRepo({
+            owner: "test01",
+            repo: "test-repo",
+            branch: "main",
+          });
+
+          for (const run of runs.data.workflow_runs) {
+            console.log(`Workflow Run: ${run.id}`);
+
+            // List all jobs for the workflow run
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({
+              owner: "test01",
+              repo: "test-repo",
+              run_id: run.id,
+            });
+
+            for (const job of jobs.data.jobs) {
+              console.log(`Job: ${job.id}, Name: ${job.name}`);
+
+              // Download logs for the job
+              const logResponse = await github.rest.actions.downloadJobLogsForWorkflowRun({
+                owner: "test01",
+                repo: "test-repo",
+                job_id: job.id,
+              });
+
+              console.log(`Logs for Job ${job.id}:`);
+              console.log(logResponse.data);
+            }
+          }
+
           await github.rest.repos.listCommitStatusesForRef({
             owner: "test01",
             repo: "test-repo",
