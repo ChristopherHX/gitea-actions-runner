@@ -199,6 +199,7 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 					}
 				}
 			}
+			logrus.Infof("Current result: %s at %s and %s", resolved.NameWithOwner, resolved.TarballUrl, resolved.ZipballUrl)
 			if noAuth {
 				// Using a dummy token has worked in 2022, but now it's broken
 				// resolved.Authentication = &protocol.ActionDownloadAuthentication{
@@ -216,12 +217,15 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 				resolved.ZipballUrl = dst.String()
 			}
 			actions[fmt.Sprintf("%s@%s", ref.NameWithOwner, ref.Ref)] = resolved
+			logrus.Infof("Resolved action: %s at %s and %s", resolved.NameWithOwner, resolved.TarballUrl, resolved.ZipballUrl)
 		}
 		jsonResponse(&protocol.ActionDownloadInfoCollection{
 			Actions: actions,
 		})
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/v1/ActionDownload") {
-		req, err := http.NewRequestWithContext(req.Context(), "GET", req.URL.Query().Get("url"), nil)
+		requestedURL := req.URL.Query().Get("url")
+		logrus.Infof("Action download requested for URL: %s", requestedURL)
+		req, err := http.NewRequestWithContext(req.Context(), "GET", requestedURL, nil)
 		if err != nil {
 			resp.WriteHeader(http.StatusNotFound)
 			return
@@ -234,6 +238,7 @@ func (server *ActionsServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 			return
 		}
 		defer rsp.Body.Close()
+		logrus.Infof("Action download http code for URL: %s %d", requestedURL, rsp.StatusCode)
 		resp.WriteHeader(rsp.StatusCode)
 		io.Copy(resp, rsp.Body)
 	} else if strings.HasPrefix(req.URL.Path, "/_apis/pipelines/workflows/") {
