@@ -1,8 +1,10 @@
+name: Integration Test
 on:
   push:
     branches:
     - main
   pull_request:
+  workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -23,6 +25,7 @@ jobs:
         gitea_platform: ${{ vars.GITEA_PLATFORM || 'linux-amd64' }}
     - name: Create test repository
       uses: actions/github-script@v7
+      timeout-minutes: 5
       with:
         script: |
           await github.rest.repos.createForAuthenticatedUser({
