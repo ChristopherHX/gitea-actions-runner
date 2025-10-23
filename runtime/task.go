@@ -398,7 +398,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 			select {
 			case obj, ok = <-actionsHttpServerHandler.TraceLog:
 			case <-time.After(nextLogSync):
-				if taskStateChanged && updateTask(reportingCtx, t, taskState, cancel, nil) == nil {
+				if taskStateChanged && taskState.Result == runnerv1.Result_RESULT_UNSPECIFIED && updateTask(reportingCtx, t, taskState, cancel, nil) == nil {
 					taskStateChanged = false
 				}
 				res, err := t.client.UpdateLog(reportingCtx, connect.NewRequest(&runnerv1.UpdateLogRequest{
@@ -414,12 +414,16 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 					} else if diff > 0 {
 						rows = rows[diff:]
 					}
+				} else if isUnauthenticatedError(err) {
+					log.Errorf("failed to update log: %v, has been removed", err)
+					rows = []*runnerv1.LogRow{}
+					cancel()
 				} else {
 					log.Errorf("failed to update log: %v, batching later", err)
 				}
 				nextMsg = true
 			case <-time.After(30 * time.Second):
-				if updateTask(reportingCtx, t, taskState, cancel, nil) == nil {
+				if taskState.Result == runnerv1.Result_RESULT_UNSPECIFIED && updateTask(reportingCtx, t, taskState, cancel, nil) == nil {
 					taskStateChanged = false
 				}
 				nextMsg = true
@@ -629,8 +633,11 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 				if len(rows) > 0 {
 					return fmt.Errorf("still logs missing")
 				}
+			} else if isUnauthenticatedError(err) {
+				log.Errorf("final failed to update log: %v, has been removed", err)
+				return nil
 			} else {
-				log.Errorf("failed to update log: %v, batching later", err)
+				log.Errorf("final failed to update log: %v, batching later", err)
 			}
 			return err
 		}, retry.Context(reportingCtx))
@@ -794,14 +801,15 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerWorker []stri
 		}
 
 		var environment *protocol.TemplateToken
-		if s.Env.Kind == yaml.ScalarNode {
+		switch s.Env.Kind {
+		case yaml.ScalarNode:
 			var expr string
 			_ = s.Env.Decode(&expr)
 			if expr != "" {
 				environment = &protocol.TemplateToken{}
 				environment.FromRawObject(expr)
 			}
-		} else if s.Env.Kind == yaml.MappingNode {
+		case yaml.MappingNode:
 			rawEnv := map[interface{}]interface{}{}
 			_ = s.Env.Decode(&rawEnv)
 			environment = &protocol.TemplateToken{}
@@ -1163,17 +1171,30 @@ func checkIntegrity(taskState *runnerv1.TaskState) {
 	taskState.Result = stepsWithPrePost[len(stepsWithPrePost)-1].Result
 }
 
+func isUnauthenticatedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "Unauthenticated")
+}
+
 func updateTaskNoRetry(ctx context.Context, t *Task, taskState *runnerv1.TaskState, cancel context.CancelFunc, outputs map[string]string) error {
 	resp, err := t.client.UpdateTask(ctx, connect.NewRequest(&runnerv1.UpdateTaskRequest{
 		State:   taskState,
 		Outputs: outputs,
 	}))
 
+	if isUnauthenticatedError(err) {
+		log.Errorf("failed to update task: %v, has been removed", err)
+		cancel()
+		return nil
+	}
+
 	if err == nil && resp.Msg.State != nil && resp.Msg.State.Result != runnerv1.Result_RESULT_UNSPECIFIED {
 		cancel()
 	}
 	if err != nil {
-		fmt.Printf("failed to updateTask: %s\n", err.Error())
+		log.Errorf("failed to updateTask: %s\n", err.Error())
 	}
 	return err
 }

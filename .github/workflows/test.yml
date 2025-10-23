@@ -1,8 +1,10 @@
+name: Integration Test
 on:
   push:
     branches:
     - main
   pull_request:
+  workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -23,6 +25,7 @@ jobs:
         gitea_platform: ${{ vars.GITEA_PLATFORM || 'linux-amd64' }}
     - name: Create test repository
       uses: actions/github-script@v7
+      timeout-minutes: 5
       with:
         script: |
           await github.rest.repos.createForAuthenticatedUser({
@@ -87,8 +90,8 @@ jobs:
               - name: Run tests
                 run: echo "Running tests..."`).toString('base64'),
           });
-          await exec.exec(`${process.env.RUNNER_BIN} register --instance http://localhost:${{ env.GITEA_PORT }} --token ${process.env.RUNNER_TOKEN} --name test-runner --labels ubuntu-latest --no-interactive --type 2`);
-          await exec.exec(`${process.env.RUNNER_BIN} daemon --once`);
+          await exec.exec(`${process.env.RUNNER_BIN} register --instance http://localhost:${{ env.GITEA_PORT }} --token ${process.env.RUNNER_TOKEN} --name test-runner --labels ubuntu-latest --no-interactive --ephemeral --type 2`);
+          await exec.exec(`${process.env.RUNNER_BIN} daemon`);
           
           // List all workflow runs
           const runs = await github.rest.actions.listWorkflowRunsForRepo({
