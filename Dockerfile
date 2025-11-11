@@ -5,13 +5,13 @@ FROM mcr.microsoft.com/dotnet/runtime-deps:6.0-jammy as build
 ARG TARGETOS
 ARG TARGETARCH
 # https://github.com/actions/runner/releases
-ARG RUNNER_VERSION=2.326.0
+ARG RUNNER_VERSION=2.329.0
 # https://github.com/actions/runner-container-hooks/releases
 ARG RUNNER_CONTAINER_HOOKS_VERSION=0.7.0
 # https://github.com/moby/moby/releases
-ARG DOCKER_VERSION=28.3.2
+ARG DOCKER_VERSION=28.5.2
 # https://github.com/docker/buildx/releases
-ARG BUILDX_VERSION=0.25.0
+ARG BUILDX_VERSION=0.29.1
 
 RUN apt update -y && apt install curl unzip -y
 
@@ -28,6 +28,10 @@ RUN curl -f -L -o runner-container-hooks.zip https://github.com/actions/runner-c
 
 RUN curl -f -L -o runner-container-hooks.zip https://github.com/actions/runner-container-hooks/releases/download/v${RUNNER_CONTAINER_HOOKS_VERSION}/actions-runner-hooks-k8s-${RUNNER_CONTAINER_HOOKS_VERSION}.zip \
     && unzip ./runner-container-hooks.zip -d ./k8s \
+    && rm runner-container-hooks.zip
+
+RUN curl -f -L -o runner-container-hooks.zip https://github.com/actions/runner-container-hooks/releases/download/v0.8.0/actions-runner-hooks-k8s-0.8.0.zip \
+    && unzip ./runner-container-hooks.zip -d ./k8s-novolume \
     && rm runner-container-hooks.zip
 
 RUN export RUNNER_ARCH=${TARGETARCH} \
